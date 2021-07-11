@@ -4,7 +4,6 @@ image_encoder.py - Image encoder for Texture Fields.
 Pretrained ResNet-18 is used.
 """
 
-import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torchvision.models as models

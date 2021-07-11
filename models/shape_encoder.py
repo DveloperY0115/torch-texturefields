@@ -30,14 +30,15 @@ class TextureFieldsShapeEncoder(nn.Module):
         Forward propagation.
 
         Args:
-        - x (torch.Tensor): A tensor of shape (N, 3) or (N, 3, 1) where N is the number of points in a point cloud.
+        - x (torch.Tensor): A tensor of shape (B, N, 3), where 
+            - B: size of a batch
+            - N: number of points in a point cloud
        
         Returns:
-        - A tensor of shape (out_dim) containing features of input point cloud.
+        - A tensor of shape (B, out_dim) containing features of input point cloud.
         """
 
-        if len(x.size()) == 2:
-            x = x.unsqueeze(2)  # (N, 3) -> (N, 3, 1)
+        x = x.transpose(1, 2)
 
         x = F.relu(self.conv_1(x))
 
@@ -49,7 +50,7 @@ class TextureFieldsShapeEncoder(nn.Module):
         x = F.relu(self.conv_3(x))
         x += skip
 
-        x, _ = torch.max(x, dim=0, keepdim=True)
+        x, _ = torch.max(x, dim=2, keepdim=True)
         x = F.relu(self.conv_4(x))
 
         return x.squeeze()

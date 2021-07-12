@@ -35,6 +35,16 @@ class TextureFieldsImageEncoder(nn.Module):
             raise ValueError("c_dim must be 512 if use_linear is False")
 
     def forward(self, x):
+        """
+        Forward propagation.
+
+        Args:
+        - x (torch.Tensor): A batch of images of shape (B, 3, W, H)
+
+        Returns:
+        - A feature tensor of shape (B, c_dim)
+        """
+
         if self.normalize:
             x = normalize_imagenet(x)
         return self.model(x)

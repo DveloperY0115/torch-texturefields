@@ -19,10 +19,10 @@ class TextureFieldsShapeEncoder(nn.Module):
 
         self.L = L
 
-        self.conv_1 = nn.Conv1d(in_dim, 256, 1)
-        self.conv_2 = nn.Conv1d(256, 128, 1)
-        self.conv_3 = nn.Conv1d(128, 128, 1)
-        self.conv_4 = nn.Conv1d(128, out_dim, 1)
+        self.fc_1 = nn.Conv1d(in_dim, 256, 1)
+        self.fc_2 = nn.Conv1d(256, 128, 1)
+        self.fc_3 = nn.Conv1d(128, 128, 1)
+        self.fc_4 = nn.Conv1d(128, out_dim, 1)
         self.resnet_blocks = nn.ModuleList([PointNetResNetBlock() for _ in range(self.L)])
 
     def forward(self, x):
@@ -40,18 +40,18 @@ class TextureFieldsShapeEncoder(nn.Module):
 
         x = x.transpose(1, 2)
 
-        x = F.relu(self.conv_1(x))
+        x = F.relu(self.fc_1(x))
 
         for i in range(self.L):
             x = F.relu(self.resnet_blocks[i](x))
 
-        x = F.relu(self.conv_2(x))
+        x = F.relu(self.fc_2(x))
         skip = x.clone()
-        x = F.relu(self.conv_3(x))
+        x = F.relu(self.fc_3(x))
         x += skip
 
         x, _ = torch.max(x, dim=2, keepdim=True)
-        x = F.relu(self.conv_4(x))
+        x = self.fc_4(x)
 
         return x.squeeze()
 
@@ -66,8 +66,8 @@ class PointNetResNetBlock(nn.Module):
         """
         super(PointNetResNetBlock, self).__init__()
 
-        self.conv_1 = nn.Conv1d(2 * hidden_dim, hidden_dim, 1)
-        self.conv_2 = nn.Conv1d(hidden_dim, hidden_dim, 1)
+        self.fc_1 = nn.Conv1d(2 * hidden_dim, hidden_dim, 1)
+        self.fc_2 = nn.Conv1d(hidden_dim, hidden_dim, 1)
 
     def forward(self, x):
         """
@@ -81,9 +81,9 @@ class PointNetResNetBlock(nn.Module):
         """
 
         # feed-forward and residual connection
-        x = F.relu(self.conv_1(x))
+        x = F.relu(self.fc_1(x))
         skip = x.clone()
-        x = F.relu(self.conv_2(x))
+        x = F.relu(self.fc_2(x))
         x += skip
 
         # max pooling, expand and concatenate

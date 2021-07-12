@@ -1,5 +1,5 @@
 """
-image_encoder.py - Image encoder for Texture Fields. 
+image_encoder.py - Subnetwork for encoding images in conditional setup.
 
 Pretrained ResNet-18 is used.
 """

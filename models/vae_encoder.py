@@ -6,6 +6,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from .resnet_block import TextureFieldsResNetBlock
+
 
 class TextureFieldsVAEEncoder(nn.Module):
     def __init__(self, shape_feature_dim=512):
@@ -23,11 +25,11 @@ class TextureFieldsVAEEncoder(nn.Module):
 
         self.resnet_blocks = nn.ModuleList(
             [
-                TextureFieldsVAEEncoderResNetBlock(32, 64),  # (128, 128)
-                TextureFieldsVAEEncoderResNetBlock(64, 128),  # (64, 64)
-                TextureFieldsVAEEncoderResNetBlock(128, 128),  # (32, 32)
-                TextureFieldsVAEEncoderResNetBlock(128, 256),  # (16, 16)
-                TextureFieldsVAEEncoderResNetBlock(256, 512),  # (8, 8)
+                TextureFieldsResNetBlock(32, 64),  # (128, 128)
+                TextureFieldsResNetBlock(64, 128),  # (64, 64)
+                TextureFieldsResNetBlock(128, 128),  # (32, 32)
+                TextureFieldsResNetBlock(128, 256),  # (16, 16)
+                TextureFieldsResNetBlock(256, 512),  # (8, 8)
             ]
         )
 
@@ -67,41 +69,3 @@ class TextureFieldsVAEEncoder(nn.Module):
         logvar = self.fc_logvar(x)
 
         return mu, logvar
-
-
-class TextureFieldsVAEEncoderResNetBlock(nn.Module):
-    def __init__(self, in_channel, out_channel):
-        """
-        Constructor of TextureFieldsVAEEncoderResNetBlock.
-
-        Args:
-        - in_channel (int): Number of channels of input feature map. Then its shape becomes (B, in_channel, H, W)
-        - out_channel (int): Number of channels of output feature map. Then its shape becomes (B, out_channel, H, W)
-        """
-        super(TextureFieldsVAEEncoderResNetBlock, self).__init__()
-
-        self.conv_1 = nn.Conv2d(in_channel, in_channel, kernel_size=(1, 1), stride=(1, 1))
-        self.conv_2 = nn.Conv2d(in_channel, in_channel, kernel_size=(1, 1), stride=(1, 1))
-        self.conv_3 = nn.Conv2d(in_channel, out_channel, kernel_size=(1, 1), stride=(1, 1))
-        self.maxpool = nn.MaxPool2d(kernel_size=(2, 2), stride=(2, 2))
-
-    def forward(self, x):
-        """
-        Forward propagation.
-
-        Args:
-        - x (torch.Tensor): Tensor of shape (B, in_channel, H, W).
-
-        Returns:
-        - Tensor of shape (B, out_channel, H, W). Output feature map.
-        """
-
-        skip = x.clone()
-        x = F.relu(self.conv_1(x))
-        x = self.conv_2(x)
-        x = F.relu(x + skip)
-        x = F.relu(self.conv_3(x))
-        x = self.maxpool(x)
-
-        return x
-

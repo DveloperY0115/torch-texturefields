@@ -51,7 +51,7 @@ class TextureFieldsCore(nn.Module):
         for i in range(self.L):
             x = F.relu(self.resnet_blocks[i](features, x))
 
-        x = self.fc_2(x)  # maybe it should be normalized to 0 ~ 1..?
+        x = self.fc_2(x)
         x = normalize_elements(x)
         return x
 
@@ -87,8 +87,7 @@ class TextureFieldsCoreResNetBlock(nn.Module):
         skip = x.clone()
 
         x = F.relu(self.fc_2(x))
-        x = F.relu(self.fc_3(x))
-
+        x = self.fc_3(x)
         x += skip
 
         return x

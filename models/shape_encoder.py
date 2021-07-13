@@ -8,21 +8,24 @@ import torch.nn.functional as F
 
 
 class TextureFieldsShapeEncoder(nn.Module):
-    def __init__(self, in_dim=3, out_dim=512, L=4):
+    def __init__(self, in_dim=3, out_dim=512, hidden_dim=128, L=4):
         """
         Constructor of TextureFieldsShapeEncoder.
 
         Args:
+        - in_dim (int): Dimensionality of input point cloud. Set to 3 by default.
+        - out_dim (int): Dimensionality of output per-point feature vector. Set to 512 by default.
+        - hidden_dim (int): Dimensionality of hidden feature vector within this ResNet block. Set to 128 by default.
         - L (int): Number of ResNet-like blocks. Set to 4 by default.
         """
         super(TextureFieldsShapeEncoder, self).__init__()
 
         self.L = L
 
-        self.fc_1 = nn.Conv1d(in_dim, 256, 1)
-        self.fc_2 = nn.Conv1d(256, 128, 1)
-        self.fc_3 = nn.Conv1d(128, 128, 1)
-        self.fc_4 = nn.Conv1d(128, out_dim, 1)
+        self.fc_1 = nn.Conv1d(in_dim, 2 * hidden_dim, 1)
+        self.fc_2 = nn.Conv1d(2 * hidden_dim, hidden_dim, 1)
+        self.fc_3 = nn.Conv1d(hidden_dim, hidden_dim, 1)
+        self.fc_4 = nn.Conv1d(hidden_dim, out_dim, 1)
         self.resnet_blocks = nn.ModuleList([PointNetResNetBlock() for _ in range(self.L)])
 
     def forward(self, x):

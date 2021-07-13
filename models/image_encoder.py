@@ -61,7 +61,7 @@ def normalize_imagenet(x):
     Returns:
     - x (torch.Tensor): Tensor of shape (B, 3, H, W). Batch of normalized images. 
     """
-    # x = x.clone()
+    x = x.clone()
     x[:, 0] = (x[:, 0] - 0.485) / 0.229
     x[:, 1] = (x[:, 1] - 0.456) / 0.224
     x[:, 2] = (x[:, 2] - 0.406) / 0.225

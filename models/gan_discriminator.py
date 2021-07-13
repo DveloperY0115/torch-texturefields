@@ -58,6 +58,6 @@ class TextureFieldsGANDiscriminator(nn.Module):
 
         x = self.fc_out(x)
 
-        discm_prob = F.sigmoid(x)
+        discm_prob = torch.sigmoid(x)
 
         return discm_prob

@@ -35,7 +35,7 @@ class TextureFieldsShapeEncoder(nn.Module):
             - N: number of points in a point cloud
        
         Returns:
-        - A tensor of shape (B, out_dim) containing features of input point cloud.
+        - x (torch.Tensor): Tensor of shape (B, out_dim). Features of input point cloud.
         """
 
         x = x.transpose(1, 2)

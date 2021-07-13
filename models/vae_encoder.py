@@ -46,7 +46,10 @@ class TextureFieldsVAEEncoder(nn.Module):
         - s (torch.Tensor): Tensor of shape (B, s_dim)
 
         Returns:
-        - Tuple of tensors of shape (B, 512). Each of which is mean and variance for image distribution, respectively.
+        - mu (torch.Tensor): Tensor of shape (B, 512). 
+                Mean values for 512-dimensional image feature vector distribution.
+        - logvar (torch.Tensor): Tensor of shape (B, 512). 
+                Log-variance values for 512-dimensional image feature vector distribution.
         """
         x = self.conv_in(x)  # (B, 32, 128, 128)
 

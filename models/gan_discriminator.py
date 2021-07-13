@@ -38,7 +38,8 @@ class TextureFieldsGANDiscriminator(nn.Module):
         - depth (torch.Tensor): Tensor of shape (B, 1, H, W). 2D depth map.
 
         Returns:
-        - Tensor of shape (B,). Tensor of probability that images in the batch are fake.
+        - discm_prob (torch.Tensor): Tensor of shape (B). 
+                Tensor of probability that images in the batch are fake. (or equivalently how plausible they are)
         """
 
         depth = depth.clone()
@@ -57,4 +58,6 @@ class TextureFieldsGANDiscriminator(nn.Module):
 
         x = self.fc_out(x)
 
-        return F.sigmoid(x)
+        discm_prob = F.sigmoid(x)
+
+        return discm_prob

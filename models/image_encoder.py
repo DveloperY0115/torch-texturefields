@@ -43,7 +43,7 @@ class TextureFieldsImageEncoder(nn.Module):
         - x (torch.Tensor): A batch of images of shape (B, 3, W, H)
 
         Returns:
-        - A feature tensor of shape (B, c_dim)
+        - x (torch.Tensor): Tensor of shape (B, c_dim). Features extracted from input images.
         """
 
         if self.normalize:
@@ -52,6 +52,15 @@ class TextureFieldsImageEncoder(nn.Module):
 
 
 def normalize_imagenet(x):
+    """
+    Normalize input images.
+
+    Args:
+    - x (torch.Tensor): Tensor of shape (B, 3, H, W). Batch of images whose pixel values to be normalized.
+
+    Returns:
+    - x (torch.Tensor): Tensor of shape (B, 3, H, W). Batch of normalized images. 
+    """
     # x = x.clone()
     x[:, 0] = (x[:, 0] - 0.485) / 0.229
     x[:, 1] = (x[:, 1] - 0.456) / 0.224

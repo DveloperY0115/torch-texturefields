@@ -37,7 +37,7 @@ class TextureFieldsCore(nn.Module):
         - s (torch.Tensor): Tensor of shape (B, shape_feature_dim). Shape latent code from shape encoder 
 
         Returns:
-        - Tensor of shape (B, 3). Predicted color vector per point in 'p'
+        - x (torch.Tensor): Tensor of shape (B, 3). Predicted color vector per point in 'p'
         """
 
         # concatenate (image, shape) features
@@ -82,7 +82,7 @@ class TextureFieldsCoreResNetBlock(nn.Module):
                                 - B: Batch size
                                 - N: Number of points in input point cloud
         Returns:
-        - Tensor of shape (B, hidden_dim). Tensor of features. 
+        - x (torch.Tensor): Tensor of shape (B, hidden_dim). Tensor of features. 
         """
 
         features = F.relu(self.fc_1(features))
@@ -107,6 +107,9 @@ def normalize_elements(x):
 
     Args:
     - x (torch.Tensor): Tensor of arbitrary shape whose elements will be normalized.
+
+    Returns:
+    - x (torch.Tensor): Tensor whose elements are normalized to [0, 1]
     """
 
     x_shape = x.size()

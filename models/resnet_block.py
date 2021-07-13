@@ -31,7 +31,7 @@ class TextureFieldsResNetBlock(nn.Module):
         - x (torch.Tensor): Tensor of shape (B, in_channel, H, W).
 
         Returns:
-        - Tensor of shape (B, out_channel, H, W). Output feature map.
+        - x (torch.Tensor): Tensor of shape (B, out_channel, H, W). Output feature map.
         """
 
         skip = x.clone()

@@ -27,8 +27,15 @@ class TextureFieldsImageEncoder(nn.Module):
         self.use_linear = use_linear
         self.model = models.resnet18(pretrained=True, progress=True)
         self.model.fc = nn.Sequential()  # ResNet-18 originally outputs score for 1000 classes
+
+        # freeze parameters of the network
+        for param in self.parameters():
+            param.requires_grad = False
+
         if use_linear:
             self.model.fc = nn.Linear(512, c_dim)
+            for param in self.model.fc.parameters():
+                param.requires_grad = True
         elif c_dim == 512:
             pass  # do nothing
         else:

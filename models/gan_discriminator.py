@@ -8,8 +8,6 @@ import torch.nn.functional as F
 
 from .resnet_block import TextureFieldsResNetBlock
 
-# TODO: Finish implementing GAN discriminator!
-
 
 class TextureFieldsGANDiscriminator(nn.Module):
     def __init__(self):
@@ -28,7 +26,8 @@ class TextureFieldsGANDiscriminator(nn.Module):
                 TextureFieldsResNetBlock(256, 512),  # (8, 8) -> (4, 4)
             ]
         )
-        self.maxpool = nn.MaxPool2d(kernel_size=(4, 4), stride=(4, 4))
+        self.maxpool = nn.MaxPool2d(kernel_size=(4, 4), stride=(4, 4))  # (4, 4) -> (1, 1)
+        self.fc_out = nn.Linear(512, 1)
 
     def forward(self, x):
         """
@@ -47,5 +46,9 @@ class TextureFieldsGANDiscriminator(nn.Module):
             x = self.resnet_blocks[i](x)
 
         x = self.maxpool(x)
+
+        x = x.view(x.size(0), -1)
+
+        x = self.fc_out(x)
 
         return F.sigmoid(x)

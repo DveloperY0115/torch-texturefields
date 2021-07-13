@@ -56,7 +56,12 @@ class TextureFieldsShapeEncoder(nn.Module):
         x, _ = torch.max(x, dim=2, keepdim=True)
         x = self.fc_4(x)
 
-        return x.squeeze()
+        x = x.squeeze()
+
+        if len(x.size()) == 1:
+            x = x.unsqueeze(0)
+
+        return x
 
 
 class PointNetResNetBlock(nn.Module):

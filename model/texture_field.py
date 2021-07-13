@@ -48,6 +48,7 @@ class TextureFieldsCls(nn.Module):
             self.p_z = None
 
         self.shape_encoder = TextureFieldsShapeEncoder()
+        self.core = TextureFieldsCore()
         self.decoder = TextureFieldsDecoder()
 
     def forward(self, depth, cam_K, cam_R, geometry, condition):
@@ -81,14 +82,14 @@ class TextureFieldsCls(nn.Module):
         else:
             assert condition is not None
             z = self.encoder(condition)
-            z = z.cuda()
 
         # get shape latent vector 's'
         s = self.shape_encoder(geometry)
 
-        # map texture colors in 3D space onto 2D image
-        coord = coord.view(batch_size, 3, W * H)
-        rgb = self.decoder(coord, z)
+        # infer color for each query points
+        coord = coord.reshape(batch_size, 3, W * H)
+        coord = coord.transpose(1, 2)
+        rgb = self.core(coord, z, s)
         rgb = rgb.view(batch_size, 3, W, H)
 
         if self.white_bg:

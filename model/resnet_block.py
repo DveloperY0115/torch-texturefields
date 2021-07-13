@@ -45,7 +45,7 @@ class TextureFieldsResNetBlock(nn.Module):
 
 
 class TextureFieldsResNetBlockPointwise(nn.Module):
-    def __init__(self, in_dim, out_dim, hidden_dim, factor=1):
+    def __init__(self, in_dim, out_dim, hidden_dim, factor=1, use_leaky=False):
         """
         Constructor of TextureFieldsResNetBlockPointwise
 
@@ -53,11 +53,13 @@ class TextureFieldsResNetBlockPointwise(nn.Module):
         - in_dim (int): Dimensionality of input feature vector.
         - out_dim (int): Dimensionality of output feature vector.
         - hidden_dim (int): Dimensionality of hidden feature vector within this ResNet block.
-        - factor (float): Weight for skip connection.
+        - factor (float): Weight for skip connection. Set to 1 by default.
+        - use_leaky (bool): Determines whether to use leaky ReLU or ReLU. Set to False by default.
         """
         super(TextureFieldsResNetBlockPointwise, self).__init__()
 
         self.factor = factor
+        self.use_leaky = use_leaky
 
         self.conv_1 = nn.Conv1d(in_dim, hidden_dim, 1)
         self.conv_2 = nn.Conv1d(hidden_dim, out_dim, 1)
@@ -74,8 +76,16 @@ class TextureFieldsResNetBlockPointwise(nn.Module):
         Args:
         - x (torch.Tensor): Tensor of shape 
         """
-        skip = x.clone()
-        x = F.relu(self.conv_1(x))
-        x = self.conv_2(x)
-        skip = self.shortcut(skip)
-        return F.relu(skip + self.factor * x)
+
+        if not self.use_leaky:
+            skip = x.clone()
+            x = F.relu(self.conv_1(x))
+            x = self.conv_2(x)
+            skip = self.shortcut(skip)
+            return F.relu(skip + self.factor * x)
+        else:
+            skip = x.clone()
+            x = F.leaky_relu(self.conv_1(x), negative_slope=0.2)
+            x = self.conv_2(x)
+            skip = self.shortcut(skip)
+            return F.leaky_relu(skip + self.factor * x, negative_slope=0.2)

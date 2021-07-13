@@ -29,16 +29,22 @@ class TextureFieldsGANDiscriminator(nn.Module):
         self.maxpool = nn.MaxPool2d(kernel_size=(4, 4), stride=(4, 4))  # (4, 4) -> (1, 1)
         self.fc_out = nn.Linear(512, 1)
 
-    def forward(self, x):
+    def forward(self, rgb, depth):
         """
         Forward propagation.
 
         Args:
-        - x (torch.Tensor): Tensor of shape (B, 4, H, W). 2D image but width additional channel for depth
+        - rgb (torch.Tensor): Tensor of shape (B, 3, H, W). 2D image.
+        - depth (torch.Tensor): Tensor of shape (B, 1, H, W). 2D depth map.
 
         Returns:
         - Tensor of shape (B,). Tensor of probability that images in the batch are fake.
         """
+
+        depth = depth.clone()
+        depth[torch.isinf(depth)] = 0
+
+        x = torch.cat((rgb, depth), dim=1)
 
         x = F.relu(self.conv_in(x))
 

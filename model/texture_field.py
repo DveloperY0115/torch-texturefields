@@ -189,3 +189,17 @@ class TextureFieldsCls(nn.Module):
 
         return z
 
+    def infer_z(self, image, s):
+        """
+        Make inference on the distribution of image latent vector 'z'.
+
+        Args:
+        - image (torch.Tensor): Tensor of shape (B, 3, H, W). Batch of images.
+        - s (torch.Tensor): Tensor of shape (B, out_dim). Batch of shape latent feature vectors corresponding to images.
+        """
+        if self.use_VAE:
+            mean_z, _ = self.encoder(image, s)
+        else:
+            batch_size = image.size(0)
+            mean_z = torch.empty(batch_size, 0, device=self._device)
+        return mean_z

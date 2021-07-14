@@ -168,4 +168,5 @@ dependencies:
     - plyfile==0.7.4
     - sigal==2.2
     - tensorboardx==2.2
+    - torchsummary==1.5.1
 prefix: /home/ubuntu/anaconda3/envs/texturefields

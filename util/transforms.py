@@ -7,7 +7,7 @@ The following codes are brought from the official repository of Texture Fields.
 import numpy as np
 from skimage.transform import resize
 from scipy.spatial import cKDTree as KDTree
-from .
+
 
 class PointcloudNoise(object):
     def __init__(self, stddev):

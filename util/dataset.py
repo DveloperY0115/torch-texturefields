@@ -83,7 +83,11 @@ class ShapeNetSingleClassDataset(data.Dataset):
         __getitem__ method of torch.utils.data.Dataset.
 
         Returns:
-        - Data object (Exact form is TBD)
+        - img (torch.Tensor): Tensor of shape (3, H, W).
+        - depth_map (torch.Tensor): Tensor of shape (1, H, W).
+        - camera_params (Dict): Dictionary of tensors. Each represents camera matrix and projection matrix associated with depth map.
+        - condition_img (torch.Tensor): Tensor of shape (3, H, W).
+        - pointcloud (torch.Tensor): Dictionary of torch.Tensors containing various geometric features of a point cloud.
         """
 
         # identify sample directories

@@ -39,7 +39,7 @@ class ShapeNetSingleClassDataset(data.Dataset):
         Then for the argument 'dataset_directory', the value 'shapenet/classA/' should be provided.
 
         Args:
-        - dataset_directory (str or os.path): Directory to where data is located.
+        - dataset_directory (str or os.path): Directory where data is located.
         - img_size (int): Size of image along one dimension. (e.g. for img_size = 128, images will be resized to 128x128)
         - num_pc_samples (int): Number of points to be selected during point cloud subsampling.
         - num_neighbors (int): Number of neighbors used during KNN computation.

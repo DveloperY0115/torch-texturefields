@@ -18,10 +18,10 @@ from model.texture_field import TextureFieldsCls
 
 parser = argparse.ArgumentParser(description="Training routine Texture Field")
 parser.add_argument("--no-cuda", type=bool, default=False, help="CUDA is not used when True")
-parser.add_argument("--batch_size", type=int, default=2, help="Size of a batch")
+parser.add_argument("--batch_size", type=int, default=15, help="Size of a batch")
 parser.add_argument("--test_set_size", type=int, default=10, help="Cardinality of test set")
 parser.add_argument("--num_epoch", type=int, default=10000, help="Number of epochs for training")
-parser.add_argument("--num_iter", type=int, default=1000, help="Number of iteration in one epoch")
+parser.add_argument("--num_iter", type=int, default=100, help="Number of iteration in one epoch")
 parser.add_argument("--lr", type=float, default=0.001, help="Initial value of learning rate")
 parser.add_argument("--beta1", type=float, default=0.9, help="Beta 1 of Adam")
 parser.add_argument("--beta2", type=float, default=0.999, help="Beta 2 of Adam")
@@ -44,7 +44,7 @@ def main():
     device = torch.device("cuda:0" if torch.cuda.is_available() and not args.no_cuda else "cpu")
 
     if (device.type == "cuda") and (torch.cuda.device_count() > 1):
-        print("[!] Multiple GPU available, but not yet supported")
+        print("[!] Multiple GPUs available, but not yet supported")
 
     # create output directory
     if not os.path.exists(args.out_dir):
@@ -74,16 +74,16 @@ def main():
         generator=torch.Generator().manual_seed(42),
     )
 
-    train_loader = data.DataLoader(train_data, batch_size=args.batch_size)
-    test_loader = data.DataLoader(test_data, batch_size=args.test_set_size)
+    train_loader = data.DataLoader(train_data, batch_size=args.batch_size, shuffle=True)
+    test_loader = data.DataLoader(test_data, batch_size=args.test_set_size, shuffle=False)
 
     # run training
-    for epoch in tqdm(range(args.num_epoch), leave=False):
+    for epoch in tqdm(range(args.num_epoch)):
 
         train_loss = train_one_epoch(model, optimizer, scheduler, device, train_loader)
 
         with torch.no_grad():
-            test_loss = test_one_epoch(model, device, test_loader)
+            test_loss = test_one_epoch(model, device, test_loader, writer, epoch)
 
         writer.add_scalar("Loss/train", train_loss, epoch)
         writer.add_scalar("Loss/test", test_loss, epoch)
@@ -199,6 +199,11 @@ def test_one_epoch(model, device, loader, writer, epoch):
         cam_K = cam_K.to(device)
         cam_R = cam_R.to(device)
         condition_img = condition_img.to(device)
+
+        # parse point cloud data
+        p = pointcloud[None].to(device)
+        n = pointcloud["normals"].to(device)
+        pointcloud = torch.cat([p, n], dim=1)
 
         # forward propagation
         gen_imgs = model(depth, cam_K, cam_R, pointcloud, condition_img)

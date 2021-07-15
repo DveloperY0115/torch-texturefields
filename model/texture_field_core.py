@@ -57,12 +57,12 @@ class TextureFieldsCore(nn.Module):
 
 
 class TextureFieldsCoreResNetBlock(nn.Module):
-    def __init__(self, z_dim=512, s_dim=512, hidden_dim=128):
+    def __init__(self, z_dim=128, s_dim=512, hidden_dim=128):
         """
         Constructor of TextureFieldsCoreResNetBlock.
 
         Args:
-        - z_dim (torch.Tensor): Dimensionality of image feature vector (or tensor). Set to 512 by default.
+        - z_dim (torch.Tensor): Dimensionality of image feature vector (or tensor). Set to 128 by default.
         - s_dim (torch.Tensor): Dimensionality of shape feature vector (or tensor). Set to 512 by default.
         - hidden_dim (torch.Tensor): Dimensionality of hidden feature vector (or tensor) within this block. Set to 128 by default.
         """

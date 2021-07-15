@@ -121,8 +121,11 @@ def train_one_epoch(model, optimizer, scheduler, device, loader):
         cam_K = cam_K.to(device)
         cam_R = cam_R.to(device)
         condition_img = condition_img.to(device)
-        pointcloud = pointcloud.to(device)
 
+        # parse point cloud data
+        p = pointcloud[None].to(device)
+        n = pointcloud["normals"].to(device)
+        pointcloud = torch.cat([p, n], dim=1)
 
         # forward propagation
         img_pred = model(depth, cam_K, cam_R, pointcloud, condition_img)

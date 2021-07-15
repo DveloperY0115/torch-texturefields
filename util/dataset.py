@@ -100,7 +100,7 @@ class ShapeNetSingleClassDataset(data.Dataset):
 
         return (img, depth_map, camera_params, condition_img, pointcloud)
 
-    def load_img_and_depth(self, sample_directory, indices, with_camera=False):
+    def load_img_and_depth(self, sample_directory, indices, with_camera=True):
         """
         Load images and associated depth maps rendered from the same viewpoint.
         Also, optionally load camera parameters for the viewpoint.
@@ -146,8 +146,8 @@ class ShapeNetSingleClassDataset(data.Dataset):
             image = load_img(filename_image, self.transform_img)
             depth = load_depth_map(filename_depth, self.transform_depth)
 
-            images.append(image.unsqueeze(0))
-            depth_maps.append(depth.unsqueeze(0))
+            images.append(image)
+            depth_maps.append(depth)
 
         images = torch.cat(images, dim=0)
         depth_maps = torch.cat(depth_maps, dim=0)
@@ -159,29 +159,28 @@ class ShapeNetSingleClassDataset(data.Dataset):
             camera_dict = np.load(camera_file)
 
             for idx in indices:
-                Rt = camera_dict["world_mat_%d" % idx].astype(np.float32)
-                K = camera_dict["camera_mat_%d" % idx].astype(np.float32)
-                camera_params["Rt"].unsqueeze(0).append(Rt)
-                camera_params["K"].unsqueeze(0).append(K)
+                Rt = torch.tensor(camera_dict["world_mat_%d" % idx].astype(np.float32))
+                K = torch.tensor(camera_dict["camera_mat_%d" % idx].astype(np.float32))
+                camera_params["Rt"].append(Rt)
+                camera_params["K"].append(K)
 
             camera_params["Rt"] = torch.cat(camera_params["Rt"], dim=0).squeeze()
             camera_params["K"] = torch.cat(camera_params["K"], dim=0).squeeze()
 
-        return images.squeeze(), depth_maps.squeeze(), camera_params
+        return images, depth_maps, camera_params
 
     def load_condition_img(self, sample_directory, use_random=True):
         """
-        Load images used in conditional setting (please refer to the paper for detail).
+        Load a random image used in conditional setting (please refer to the paper for detail).
         These images are then used as appearance reference for Texture Field.
 
         Args:
         - sample_directory (str or os.path): Root directory of the sample.
-        - indices (Iterable): List (or tuple) of indices specifying which pairs of image-depth to be loaded.
         - use_random (bool): Determines whether to sample condition image randomly or not.
             If set to false, then the first image in the directory is used.
 
         Returns:
-        - images (torch.Tensor): Tensor of shape (len(indices), 3, 224, 224).
+        - images (torch.Tensor): Tensor of shape (3, 224, 224).
         """
         # identify directories for each type of data
         image_dir = os.path.join(sample_directory, "input_image")

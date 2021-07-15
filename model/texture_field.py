@@ -80,7 +80,7 @@ class TextureFieldsCls(nn.Module):
         if self.use_VAE:
             z = self.get_z_from_prior((batch_size,))
         else:
-            assert condition is not None
+            assert condition is not None, "Condition image must be provided when VAE is NOT used"
             z = self.encoder(condition)
 
         # get shape latent vector 's'

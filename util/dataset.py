@@ -126,8 +126,12 @@ class ShapeNetSingleClassDataset(data.Dataset):
         image_dir = os.path.join(sample_directory, "image")
         depth_dir = os.path.join(sample_directory, "depth")
 
-        assert os.path.exists(image_dir)
-        assert os.path.exists(depth_dir)
+        assert os.path.exists(image_dir), "[!] Directory of images {} doesn't exist".format(
+            image_dir
+        )
+        assert os.path.exists(depth_dir), "[!] Directory of depth maps {} doesn't exist".format(
+            depth_dir
+        )
 
         image_files = glob.glob(os.path.join(image_dir, "*.{}".format("png")))
         depth_files = glob.glob(os.path.join(depth_dir, "*.{}".format("exr")))
@@ -189,7 +193,9 @@ class ShapeNetSingleClassDataset(data.Dataset):
         # identify directories for each type of data
         image_dir = os.path.join(sample_directory, "input_image")
 
-        assert os.path.exists(image_dir)
+        assert os.path.exists(
+            image_dir
+        ), "[!] Directory of condition images {} doesn't exist".format(image_dir)
 
         image_files = glob.glob(os.path.join(image_dir, "*.{}".format("jpg")))
         image_files.sort()
@@ -221,9 +227,11 @@ class ShapeNetSingleClassDataset(data.Dataset):
             - "None" -> torch.Tensor containing 3-coordinates of points of a point cloud.
             - "normal" -> torch.Tensor containing 3-vectors of normal vectors at each point.
             - [Optional] "loc" -> torch.Tensor containing (?) 
-            - [Optional] "scale" -> torch.Tensor containing (?) 
+            - [Optional] "scale" -> torch.Tensor containing (?)
         """
         filename = os.path.join(sample_directory, "pointcloud.npz")
+
+        assert os.path.exists(filename), "[!] Point cloud file at {} doesn't exist".format(filename)
 
         pointcloud_dict = np.load(filename)
 

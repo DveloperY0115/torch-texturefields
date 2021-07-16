@@ -17,8 +17,6 @@ from .shape_encoder import TextureFieldsShapeEncoder
 from .texture_field_core import TextureFieldsCore
 from .gan_discriminator import TextureFieldsGANDiscriminator
 from .vae_encoder import TextureFieldsVAEEncoder
-from .decoder import TextureFieldsDecoder
-
 
 class TextureFieldsCls(nn.Module):
     def __init__(self, use_VAE=False, p_z=None, white_bg=True, use_MAP=False):
@@ -49,7 +47,6 @@ class TextureFieldsCls(nn.Module):
 
         self.shape_encoder = TextureFieldsShapeEncoder()
         self.core = TextureFieldsCore(z_dim=512)
-        self.decoder = TextureFieldsDecoder()
 
     def forward(self, depth, cam_K, cam_R, geometry, condition):
         """

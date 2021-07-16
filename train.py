@@ -69,7 +69,7 @@ def main():
     if multi_gpu:
         model = nn.DataParallel(model)
 
-    optimizer = optim.RMSprop(model.parameters(), lr=args.lr)
+    optimizer = optim.Adam(model.parameters(), lr=args.lr, betas=(args.beta1, args.beta2))
     scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=args.step_size, gamma=args.gamma)
 
     # define dataset, loaders

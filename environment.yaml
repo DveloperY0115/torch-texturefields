@@ -159,14 +159,18 @@ dependencies:
   - zlib=1.2.11=h7b6447c_3
   - zstd=1.4.9=haebb681_0
   - pip:
+    - future==0.18.2
     - h5py==3.3.0
     - jinja2==3.0.1
     - lmdb==1.2.1
     - markupsafe==2.0.1
     - natsort==7.1.1
+    - nonechucks==0.4.2
     - pilkit==2.0
     - plyfile==0.7.4
     - sigal==2.2
+    - tensorboard-data-server==0.6.1
     - tensorboardx==2.2
+    - torch-tb-profiler==0.2.1
     - torchsummary==1.5.1
 prefix: /home/ubuntu/anaconda3/envs/texturefields

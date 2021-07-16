@@ -62,24 +62,8 @@ args = parser.parse_args()
 
 def main():
 
-    # check GPU
-    device = torch.device(
-        "cuda:{}".format(args.device_id)
-        if torch.cuda.is_available() and not args.no_cuda
-        else "cpu"
-    )
-    print("[!] Using {} as default device".format(device))
-
-    if torch.cuda.is_available() and args.no_cuda:
-        print("[!] Your system is capable of GPU computing but is set not to use it.")
-        print("[!] It's highly recommended to use GPUs for training!")
-
-    if (device.type == "cuda") and (torch.cuda.device_count() > 1):
-        print("[!] Multiple GPUs available.")
-
-        if not args.use_multi_gpu:
-            print("[!] But it's set to start with single GPU")
-            print("[!] It's highly recommended to use multiple GPUs if possible!")
+    # configure device (cpu or gpu)
+    device = configure_device(args.device_id)
 
     # create output directory
     if not os.path.exists(args.out_dir):
@@ -102,7 +86,16 @@ def main():
     writer = SummaryWriter(log_dir=log_dir)
 
     # define model, optimizer, and LR scheduler
-    model = TextureFieldsCls().to(device)
+    if args.experiment_setting == "conditional":
+        model = TextureFieldsCls()
+    elif args.experiment_setting == "generative":
+        model = TextureFieldsCls()
+    else:
+        print(
+            "[!] Please provide valid argument. Experiment settings can either be 'conditional' or 'generative'"
+        )
+        return -1
+    model = model.to(device)
 
     # toggle data parallelism
     if args.use_multi_gpu:
@@ -164,6 +157,37 @@ def main():
             save_checkpoint(epoch, train_loss, model, optimizer, scheduler, checkpoint_dir)
 
     writer.close()
+
+
+def configure_device(device_id):
+    """
+    Configure which device to run training on.
+    Inform users various tips based on the status of their machine.
+
+    Args:
+    - device_id (int): Index of device to be used.
+
+    Returns:
+    - device (torch.device): Context-manager in Pytorch which designates the selected device.
+    """
+
+    device = torch.device(
+        "cuda:{}".format(device_id) if torch.cuda.is_available() and not args.no_cuda else "cpu"
+    )
+    print("[!] Using {} as default device".format(device))
+
+    if torch.cuda.is_available() and args.no_cuda:
+        print("[!] Your system is capable of GPU computing but is set not to use it.")
+        print("[!] It's highly recommended to use GPUs for training!")
+
+    if (device.type == "cuda") and (torch.cuda.device_count() > 1):
+        print("[!] Multiple GPUs available.")
+
+        if not args.use_multi_gpu:
+            print("[!] But it's set to start with single GPU")
+            print("[!] It's highly recommended to use multiple GPUs if possible!")
+
+    return device
 
 
 def train_one_epoch(model, optimizer, scheduler, device, loader):

@@ -83,10 +83,10 @@ class PointNetResNetBlock(nn.Module):
         Forward propagation.
 
         Args:
-        - x (torch.Tensor): Tensor of shape (N, 2 * hidden_dim, 1)
+        - x (torch.Tensor): Tensor of shape (N, 2 * hidden_dim, 1).
         
         Returns:
-        - A tensor of shape (N, 2 * hidden_dim, 1)
+        - x (torch.Tensor): Tensor of shape (N, 2 * hidden_dim, 1).
         """
 
         # feed-forward and residual connection

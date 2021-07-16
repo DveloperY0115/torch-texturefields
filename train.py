@@ -18,17 +18,20 @@ from model.texture_field import TextureFieldsCls
 
 parser = argparse.ArgumentParser(description="Training routine Texture Field")
 parser.add_argument("--no-cuda", type=bool, default=False, help="CUDA is not used when True")
-parser.add_argument("--batch_size", type=int, default=15, help="Size of a batch")
+parser.add_argument("--batch_size", type=int, default=32, help="Size of a batch")
 parser.add_argument("--test_set_size", type=int, default=10, help="Cardinality of test set")
 parser.add_argument("--num_epoch", type=int, default=10000, help="Number of epochs for training")
 parser.add_argument("--num_iter", type=int, default=100, help="Number of iteration in one epoch")
-parser.add_argument("--lr", type=float, default=0.001, help="Initial value of learning rate")
+parser.add_argument(
+    "--num_workers", type=int, default=10, help="Number of workers for data loading"
+)
+parser.add_argument("--lr", type=float, default=0.0001, help="Initial value of learning rate")
 parser.add_argument("--beta1", type=float, default=0.9, help="Beta 1 of Adam")
 parser.add_argument("--beta2", type=float, default=0.999, help="Beta 2 of Adam")
 parser.add_argument(
-    "--step_size", type=int, default=100, help="Step size for learning rate scheduling"
+    "--step_size", type=int, default=200, help="Step size for learning rate scheduling"
 )
-parser.add_argument("--gamma", type=float, default=0.5, help="Gamma for learning rate scheduling")
+parser.add_argument("--gamma", type=float, default=0.85, help="Gamma for learning rate scheduling")
 parser.add_argument(
     "--out_dir", type=str, default="out", help="Directory where the outputs will be saved"
 )
@@ -43,8 +46,11 @@ def main():
     # check GPU
     device = torch.device("cuda:0" if torch.cuda.is_available() and not args.no_cuda else "cpu")
 
+    multi_gpu = False
+
     if (device.type == "cuda") and (torch.cuda.device_count() > 1):
-        print("[!] Multiple GPUs available, but not yet supported")
+        print("[!] Multiple GPUs available")
+        multi_gpu = True
 
     # create output directory
     if not os.path.exists(args.out_dir):
@@ -60,7 +66,10 @@ def main():
 
     # define model, optimizer, and LR scheduler
     model = TextureFieldsCls().to(device)
-    optimizer = optim.Adam(model.parameters(), lr=args.lr, betas=(args.beta1, args.beta2))
+    if multi_gpu:
+        model = nn.DataParallel(model)
+
+    optimizer = optim.RMSprop(model.parameters(), lr=args.lr)
     scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=args.step_size, gamma=args.gamma)
 
     # define dataset, loaders
@@ -74,7 +83,9 @@ def main():
         generator=torch.Generator().manual_seed(42),
     )
 
-    train_loader = data.DataLoader(train_data, batch_size=args.batch_size, shuffle=True)
+    train_loader = data.DataLoader(
+        train_data, batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers
+    )
     test_loader = data.DataLoader(test_data, batch_size=args.test_set_size, shuffle=False)
 
     # run training

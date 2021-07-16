@@ -45,11 +45,16 @@ def main():
 
     # check GPU
     device = torch.device("cuda:0" if torch.cuda.is_available() and not args.no_cuda else "cpu")
+    print("[!] Using {}".format(device))
+
+    if torch.cuda.is_available() and args.no_cuda:
+        print("[!] Your system is capable of GPU computing but is set not to use it.")
+        print("[!] It's highly recommended to use GPUs for training!")
 
     multi_gpu = False
 
     if (device.type == "cuda") and (torch.cuda.device_count() > 1):
-        print("[!] Multiple GPUs available")
+        print("[!] Multiple GPUs available. Data flow will be parallelized.")
         multi_gpu = True
 
     # create output directory
@@ -164,7 +169,7 @@ def train_one_epoch(model, optimizer, scheduler, device, loader):
         optimizer.step()
 
         # update scheduler
-        scheduler.step()
+        # scheduler.step()
 
         train_loss += loss.item()
 

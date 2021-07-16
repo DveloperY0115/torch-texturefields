@@ -44,11 +44,11 @@ class TextureFieldsCls(nn.Module):
             else:
                 self.p_z = p_z
         else:
-            self.encoder = TextureFieldsImageEncoder()
+            self.encoder = TextureFieldsImageEncoder(c_dim=512)
             self.p_z = None
 
         self.shape_encoder = TextureFieldsShapeEncoder()
-        self.core = TextureFieldsCore()
+        self.core = TextureFieldsCore(z_dim=512)
         self.decoder = TextureFieldsDecoder()
 
     def forward(self, depth, cam_K, cam_R, geometry, condition):

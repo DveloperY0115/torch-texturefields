@@ -4,6 +4,7 @@ train.py - Training routine for Texture Fields architecture.
 
 import argparse
 import os
+import glob
 from tqdm import tqdm
 
 import torch
@@ -17,8 +18,20 @@ from util.dataset import ShapeNetSingleClassDataset
 from model.texture_field import TextureFieldsCls
 
 parser = argparse.ArgumentParser(description="Training routine Texture Field")
+parser.add_argument(
+    "--experiment_setting",
+    type=str,
+    default="generative",
+    help="Toggle experiment settings. Can be either 'conditional' or 'generative'",
+)
 parser.add_argument("--no-cuda", type=bool, default=False, help="CUDA is not used when True")
-parser.add_argument("--batch_size", type=int, default=32, help="Size of a batch")
+parser.add_argument(
+    "--device_id", type=int, default=0, help="CUDA device ID if multiple devices available"
+)
+parser.add_argument(
+    "--use_multi_gpu", type=bool, default=False, help="Use multiple GPUs if available"
+)
+parser.add_argument("--batch_size", type=int, default=64, help="Size of a batch")
 parser.add_argument("--test_set_size", type=int, default=10, help="Cardinality of test set")
 parser.add_argument("--num_epoch", type=int, default=10000, help="Number of epochs for training")
 parser.add_argument("--num_iter", type=int, default=100, help="Number of iteration in one epoch")
@@ -36,6 +49,12 @@ parser.add_argument(
     "--out_dir", type=str, default="out", help="Directory where the outputs will be saved"
 )
 parser.add_argument(
+    "--start_from_checkpoint",
+    type=bool,
+    default=True,
+    help="Start from existing checkpoint if possible",
+)
+parser.add_argument(
     "--save_period", type=int, default=100, help="Number of epochs between checkpoints"
 )
 args = parser.parse_args()
@@ -44,57 +63,94 @@ args = parser.parse_args()
 def main():
 
     # check GPU
-    device = torch.device("cuda:0" if torch.cuda.is_available() and not args.no_cuda else "cpu")
-    print("[!] Using {}".format(device))
+    device = torch.device(
+        "cuda:{}".format(args.device_id)
+        if torch.cuda.is_available() and not args.no_cuda
+        else "cpu"
+    )
+    print("[!] Using {} as default device".format(device))
 
     if torch.cuda.is_available() and args.no_cuda:
         print("[!] Your system is capable of GPU computing but is set not to use it.")
         print("[!] It's highly recommended to use GPUs for training!")
 
-    multi_gpu = False
-
     if (device.type == "cuda") and (torch.cuda.device_count() > 1):
-        print("[!] Multiple GPUs available. Data flow will be parallelized.")
-        multi_gpu = True
+        print("[!] Multiple GPUs available.")
+
+        if not args.use_multi_gpu:
+            print("[!] But it's set to start with single GPU")
+            print("[!] It's highly recommended to use multiple GPUs if possible!")
 
     # create output directory
     if not os.path.exists(args.out_dir):
         os.mkdir(args.out_dir)
 
-    log_dir = os.path.join(args.out_dir, "runs")
+    # define & create experiment-specific directory
+    experiment_dir = os.path.join(args.out_dir, args.experiment_setting)
+    if not os.path.exists(experiment_dir):
+        os.mkdir(experiment_dir)
 
+    # define & create log output directory
+    log_dir = os.path.join(experiment_dir, "runs")
     if not os.path.exists(log_dir):
         os.mkdir(log_dir)
+
+    # define checkpoint directory
+    checkpoint_dir = os.path.join(experiment_dir, "checkpoint")
 
     # initialize writer for Tensorboard
     writer = SummaryWriter(log_dir=log_dir)
 
     # define model, optimizer, and LR scheduler
     model = TextureFieldsCls().to(device)
-    if multi_gpu:
+
+    # toggle data parallelism
+    if args.use_multi_gpu:
         model = nn.DataParallel(model)
 
     optimizer = optim.Adam(model.parameters(), lr=args.lr, betas=(args.beta1, args.beta2))
     scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=args.step_size, gamma=args.gamma)
 
-    # define dataset, loaders
+    epoch_0 = 0
+
+    # load checkpoint if exists
+    if args.start_from_checkpoint:
+        checkpoint = load_checkpoint(checkpoint_dir)
+
+        # parse checkpoint and initialize state
+        if checkpoint is not None:
+            epoch_0 = checkpoint["epoch"]
+
+            # set model, optimizer, scheduler parameters
+            if args.use_multi_gpu:
+                model.module.load_state_dict(checkpoint["model_state_dict"])
+            else:
+                model.load_state_dict(checkpoint["model_state_dict"])
+            optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+            scheduler.load_state_dict(checkpoint["scheduler_state_dict"])
+
+            model.train()
+
+    # define dataset
     dataset = ShapeNetSingleClassDataset(
         "data/shapenet/synthetic_cars_nospecular", img_size=128, num_pc_samples=2048
     )
 
+    # split dataset into train / test
     train_data, test_data = data.random_split(
         dataset,
         [len(dataset) - args.test_set_size, args.test_set_size],
         generator=torch.Generator().manual_seed(42),
     )
 
+    # configure data loaders
     train_loader = data.DataLoader(
         train_data, batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers
     )
     test_loader = data.DataLoader(test_data, batch_size=args.test_set_size, shuffle=False)
 
     # run training
-    for epoch in tqdm(range(args.num_epoch)):
+    for epoch in tqdm(range(epoch_0, args.num_epoch)):
 
         train_loss = train_one_epoch(model, optimizer, scheduler, device, train_loader)
 
@@ -105,7 +161,7 @@ def main():
         writer.add_scalar("Loss/test", test_loss, epoch)
 
         if (epoch + 1) % args.save_period == 0:
-            save_checkpoint(epoch, train_loss, model, optimizer, scheduler)
+            save_checkpoint(epoch, train_loss, model, optimizer, scheduler, checkpoint_dir)
 
     writer.close()
 
@@ -241,7 +297,7 @@ def test_one_epoch(model, device, loader, writer, epoch):
     return avg_loss
 
 
-def save_checkpoint(epoch, loss, model, optimizer, scheduler):
+def save_checkpoint(epoch, loss, model, optimizer, scheduler, save_dir):
     """
     Save checkpoint.
 
@@ -251,28 +307,66 @@ def save_checkpoint(epoch, loss, model, optimizer, scheduler):
     - model (torch.nn.Module): Neural network to be trained.
     - optimizer (torch.optim.Optimizer): Optimizer used for training.
     - scheduler (torch.optim.lr_scheduler): Learning rate scheduler.
+    - save_dir (str or os.path): Directory where checkpoint files will be saved.
     """
-    if not os.path.exists(args.out_dir):
-        os.mkdir(args.out_dir)
+    if not os.path.exists(save_dir):
+        os.mkdir(save_dir)
 
-    save_root = os.path.join(args.out_dir, "checkpoint")
+    if not os.path.exists(save_dir):
+        os.mkdir(save_dir)
 
-    if not os.path.exists(save_root):
-        os.mkdir(save_root)
-
-    save_path = os.path.join(save_root, "checkpoint-epoch-{}.pt".format(epoch + 1))
+    save_path = os.path.join(save_dir, "checkpoint-epoch-{}.tar".format(epoch + 1))
 
     torch.save(
         {
             "epoch": epoch,
             "loss": loss,
-            "model_state_dict": model.state_dict(),
+            "model_state_dict": model.module.state_dict()
+            if args.use_multi_gpu
+            else model.state_dict(),
             "optimizer_state_dict": optimizer.state_dict(),
             "scheduler_state_dict": scheduler.state_dict(),
         },
         save_path,
     )
     print("[!] Saved model at: {}".format(save_path))
+
+
+def load_checkpoint(checkpoint_root, load_latest=True):
+    """
+    Load existing checkpoint to resume training.
+
+    Args:
+    - checkpoint_root (str or os.path): Path to directory containing checkpoint files.
+    - load_latest (bool): Determines whether to load the latest checkpoint or not.
+
+    NOTE: This function currently supports load latest-only.
+
+    Returns:
+    - checkpoint (Dict): Dictionary containing parameters of model, optimizer, scheduler and other values for tracking progress.
+        - epoch (int): Index of epoch.
+        - loss (float): Current value of loss.
+        - model_state_dict (torch.nn.Module.state_dict): Dictionary containing current status of neural network.
+        - optimizer_state_dict (torch.optim.Optimizer.state_dict): Dictionary containing current status of optimizer.
+        - scheduler_state_dict (torch.optim.lr_scheduler.state_dict): Dictionary containing current status of scheduler.
+    - [Exceptionally] None: If there's no checkpoint directory or files.
+    """
+
+    if not os.path.exists(checkpoint_root):
+        print("[!] No checkpoint loaded")
+        return None
+
+    checkpoint_files = glob.glob(os.path.join(checkpoint_root, "*.{}".format("tar")))
+    checkpoint_files.sort()
+
+    if len(checkpoint_files) == 0:
+        print("[!] No checkpoint loaded")
+        return None
+
+    latest_checkpoint = checkpoint_files[-1]
+
+    print("[!] Loading the latest checkpoint {}".format(latest_checkpoint))
+    return torch.load(latest_checkpoint)
 
 
 if __name__ == "__main__":

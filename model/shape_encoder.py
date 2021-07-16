@@ -102,4 +102,4 @@ class PointNetResNetBlock(nn.Module):
         x_ = x_.repeat(1, 1, num_points)
         x_ = torch.cat((x_, skip), dim=1)
 
-        return x
+        return x_

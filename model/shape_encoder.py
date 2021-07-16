@@ -90,16 +90,16 @@ class PointNetResNetBlock(nn.Module):
         """
 
         # feed-forward and residual connection
-        x_ = F.relu(self.fc_1(x))
-        x_ = F.relu(self.fc_2(x_))
         skip = self.short_cut(x)
-        x_ += skip
+        x = F.relu(self.fc_1(x))
+        x = F.relu(self.fc_2(x))
+        x += skip
 
         # max pooling, expand and concatenate
-        num_points = x_.size()[2]
-        skip = x_.clone()
-        x_, _ = torch.max(x_, dim=2, keepdim=True)
-        x_ = x_.repeat(1, 1, num_points)
-        x_ = torch.cat((x_, skip), dim=1)
+        num_points = x.size()[2]
+        skip = x.clone()
+        x, _ = torch.max(x, dim=2, keepdim=True)
+        x = x.repeat(1, 1, num_points)
+        x = torch.cat((x, skip), dim=1)
 
-        return x_
+        return x

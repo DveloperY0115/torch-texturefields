@@ -25,7 +25,9 @@ class TextureFieldsCore(nn.Module):
 
         self.fc_1 = nn.Conv1d(3, 128, 1)
         self.fc_2 = nn.Conv1d(128, 3, 1)
-        self.resnet_blocks = nn.ModuleList([TextureFieldsCoreResNetBlock() for _ in range(self.L)])
+        self.resnet_blocks = nn.ModuleList(
+            [TextureFieldsCoreResNetBlock(z_dim=z_dim, s_dim=s_dim) for _ in range(self.L)]
+        )
 
     def forward(self, p, z, s):
         """
@@ -52,12 +54,12 @@ class TextureFieldsCore(nn.Module):
             x = F.relu(self.resnet_blocks[i](features, x))
 
         x = self.fc_2(x)
-        x = normalize_elements(x)
+        x = torch.sigmoid(x)
         return x
 
 
 class TextureFieldsCoreResNetBlock(nn.Module):
-    def __init__(self, z_dim=128, s_dim=512, hidden_dim=128):
+    def __init__(self, z_dim=512, s_dim=512, hidden_dim=128):
         """
         Constructor of TextureFieldsCoreResNetBlock.
 
@@ -99,23 +101,3 @@ class TextureFieldsCoreResNetBlock(nn.Module):
         x += skip
 
         return x
-
-
-def normalize_elements(x):
-    """
-    Normalize elements of 'x' so that they fit in [0, 1].
-
-    Args:
-    - x (torch.Tensor): Tensor of arbitrary shape whose elements will be normalized.
-
-    Returns:
-    - x (torch.Tensor): Tensor whose elements are normalized to [0, 1]
-    """
-
-    x_shape = x.size()
-    x = x.view(x.size(0), -1)
-    x -= x.min(1, keepdim=True)[0]
-    x /= x.max(1, keepdim=True)[0]
-    x = x.view(x_shape)
-
-    return x

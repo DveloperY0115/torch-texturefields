@@ -65,22 +65,10 @@ def main():
     # configure device (cpu or gpu)
     device = configure_device(args.device_id)
 
-    # create output directory
-    if not os.path.exists(args.out_dir):
-        os.mkdir(args.out_dir)
-
-    # define & create experiment-specific directory
-    experiment_dir = os.path.join(args.out_dir, args.experiment_setting)
-    if not os.path.exists(experiment_dir):
-        os.mkdir(experiment_dir)
-
-    # define & create log output directory
-    log_dir = os.path.join(experiment_dir, "runs")
-    if not os.path.exists(log_dir):
-        os.mkdir(log_dir)
-
-    # define checkpoint directory
-    checkpoint_dir = os.path.join(experiment_dir, "checkpoint")
+    # directories
+    _, _, log_dir, checkpoint_dir = configure_output_directories(
+        args.out_dir, args.experiment_setting
+    )
 
     # initialize writer for Tensorboard
     writer = SummaryWriter(log_dir=log_dir)
@@ -188,6 +176,38 @@ def configure_device(device_id):
             print("[!] It's highly recommended to use multiple GPUs if possible!")
 
     return device
+
+
+def configure_output_directories(out_root, experiment_setting):
+    """
+    Setup directories where outputs (log, checkpoint, etc) will be saved.
+    Configure directory differently for different experiment settings.
+
+    Args:
+    - out_root (str or os.path): Root of the output directory.
+    - experiment_setting (str): Indicator for experiment setting. Can be either 'conditional' or 'generative'.
+
+    Returns:
+    - Tuple of strings each representing directories created inside this function.
+    """
+
+    if not os.path.exists(out_root):
+        os.mkdir(out_root)
+
+    # experiment specific directory
+    experiment_dir = os.path.join(out_root, experiment_setting)
+    if not os.path.exists(experiment_dir):
+        os.mkdir(experiment_dir)
+
+    # log output directory
+    log_dir = os.path.join(experiment_dir, "runs")
+    if not os.path.exists(log_dir):
+        os.mkdir(log_dir)
+
+    # checkpoint directory
+    checkpoint_dir = os.path.join(experiment_dir, "checkpoint")
+
+    return out_root, experiment_dir, log_dir, checkpoint_dir
 
 
 def train_one_epoch(model, optimizer, scheduler, device, loader):

@@ -73,6 +73,10 @@ class PointNetResNetBlock(nn.Module):
 
         self.fc_1 = nn.Conv1d(2 * hidden_dim, hidden_dim, 1)
         self.fc_2 = nn.Conv1d(hidden_dim, hidden_dim, 1)
+        self.short_cut = nn.Conv1d(2 * hidden_dim, hidden_dim, 1, bias=False)
+
+        # initialization
+        nn.init.zeros_(self.fc_2.weight)
 
     def forward(self, x):
         """
@@ -86,16 +90,16 @@ class PointNetResNetBlock(nn.Module):
         """
 
         # feed-forward and residual connection
-        x = F.relu(self.fc_1(x))
-        skip = x.clone()
-        x = F.relu(self.fc_2(x))
-        x += skip
+        x_ = F.relu(self.fc_1(x))
+        x_ = F.relu(self.fc_2(x_))
+        skip = self.short_cut(x)
+        x_ += skip
 
         # max pooling, expand and concatenate
-        num_points = x.size()[0]
-        skip = x.clone()
-        x, _ = torch.max(x, dim=0, keepdim=True)
-        x = x.repeat(num_points, 1, 1)
-        x = torch.cat((x, skip), dim=1)
+        num_points = x_.size()[2]
+        skip = x_.clone()
+        x_, _ = torch.max(x_, dim=2, keepdim=True)
+        x_ = x_.repeat(1, 1, num_points)
+        x_ = torch.cat((x_, skip), dim=1)
 
         return x

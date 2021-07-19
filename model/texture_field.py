@@ -37,6 +37,10 @@ class TextureFieldsCls(nn.Module):
         self.white_bg = white_bg
         self.use_MAP = use_MAP
 
+        # initialize posterior distribution
+        if self.mode == "vae":
+            self.q_z = None
+
         # set experimental setting specific submodules
         if self.mode == "conditional":
             self.encoder = TextureFieldsImageEncoder(c_dim=512)
@@ -46,7 +50,6 @@ class TextureFieldsCls(nn.Module):
             else:
                 # GAN
                 self.encoder = None
-                self.discriminator = TextureFieldsGANDiscriminator()
 
         # initialize shape encoder
         self.shape_encoder = TextureFieldsShapeEncoder()
@@ -71,6 +74,7 @@ class TextureFieldsCls(nn.Module):
         - out (Dict): Dictionary containing outputs of model such as predicted image, loss, etc..
             - out["img_pred"] (torch.Tensor): Tensor of shape (B, 3, H, W). Batch of predicted images
             - out["loss"] (scalar): Computed loss. Can be used for back propagation later.
+            NOTE: For GAN training, this method returns only 
         """
         batch_size, _, W, H = depth.size()
         assert depth.size(1) == 1
@@ -79,31 +83,27 @@ class TextureFieldsCls(nn.Module):
 
         coord, mask = self.unproject_depth(depth, cam_K, cam_R)
 
+        coord = coord.reshape(batch_size, 3, W * H)  # (B, 3, H, W) -> (B, 3, H * W)
+        coord = coord.transpose(1, 2)  # (B, 3, H * W) -> (B, H * W, 3)
+
         # get shape latent vector 's'
         s = self.shape_encoder(geometry)
 
-        # get image latent vector 'z' either by:
+        # get image latent vector 'z'
         if self.mode == "gan":
-            # (1) Sampling from prior 'p0_z'
             z = self.get_z_from_prior((batch_size,))
-
         else:
-            # (2) Infer from encoder
             if self.mode == "conditional":
-                # conditional
                 assert (
                     condition is not None
                 ), "[!] Condition image must be provided in conditional setting!"
                 z = self.encoder(condition)
-            else:
-                # VAE
+            else:  # VAE
                 mu, logvar = self.encoder(real, s)
-                q_z = dist.Normal(mu, torch.exp(logvar))
-                z = q_z.rsample()
+                self.q_z = dist.Normal(mu, torch.exp(logvar))  # update posterior
+                z = self.q_z.rsample()
 
         # infer color for each query points
-        coord = coord.reshape(batch_size, 3, W * H)
-        coord = coord.transpose(1, 2)
         rgb = self.core(coord, z, s)
         rgb = rgb.view(batch_size, 3, W, H)
 
@@ -120,18 +120,67 @@ class TextureFieldsCls(nn.Module):
         out["img_pred"] = img
 
         # compute experiment specific losses
-        if self.mode == "conditional":
+        if self.mode == "conditional" or self.mode == "gan":
             out["loss"] = nn.L1Loss()(img, real)
-        elif self.mode == "vae":
+        else:  # VAE
             p0_z = dist.Normal(torch.zeros(512).to(self.device), torch.ones(512).to(self.device))
             reconstruction_loss = F.mse_loss(img, real).sum(dim=-1).mean()
-            kl = dist.kl_divergence(q_z, p0_z).sum(dim=-1).mean() / float(H * W * 3)
+            kl = dist.kl_divergence(self.q_z, p0_z).sum(dim=-1).mean() / float(H * W * 3)
             out["loss"] = reconstruction_loss + kl  # ELBO
-        else:
-            pass
+
         return out
 
     # helper functions
+    def generate_images(self, depth, cam_K, cam_R, geometry):
+        """
+        Generate images given coordinates in 3D space and shape latent code.
+        Used for image generation at test time.
+
+        Args:
+        - depth (torch.Tensor): Tensor of shape (B, 1, H, W). Batch of depth maps.
+        - cam_K (torch.Tensor): Tensor of shape (B, 3, 4). Batch of camera projection matrices.
+        - cam_R (torch.Tensor): Tensor of shape (B, 3, 4). Batch of camera matrices representing camera's translation and rotation.
+        - geometry (dict): Dictionary containing one or more geometric features of input shapes
+                - e.g. { 'points': (torch.Tensor / <B, 3, N>), 'normals': (torch.Tensor / <B, 3, N>)}
+
+        Returns:
+        - img (torch.Tensor): Tensor of shape (B, 3, H, W). Batch of generated images.
+        """
+        with torch.no_grad():
+            assert (
+                self.mode != "conditional"
+            ), "[!] Conditional model cannot be used for image generation!"
+
+            batch_size, _, W, H = depth.size()
+            assert depth.size(1) == 1
+            assert cam_K.size() == (batch_size, 3, 4)
+            assert cam_R.size() == (batch_size, 3, 4)
+
+            coord, mask = self.unproject_depth(depth, cam_K, cam_R)
+
+            coord = coord.reshape(batch_size, 3, W * H)  # (B, 3, H, W) -> (B, 3, H * W)
+            coord = coord.transpose(1, 2)  # (B, 3, H * W) -> (B, H * W, 3)
+
+            # get shape latent vector 's'
+            s = self.shape_encoder(geometry)
+
+            if self.mode == "vae":
+                z = self.get_z_from_posterior()
+            else:  # GAN
+                z = self.get_z_from_prior()
+
+            rgb = self.core(coord, z, s)
+            rgb = rgb.view(batch_size, 3, W, H)
+
+            if self.white_bg:
+                rgb_bg = torch.ones_like(rgb)
+            else:
+                rgb_bg = torch.zeros_like(rgb)
+
+            img = (mask * rgb).permute(0, 1, 3, 2) + (1 - mask.permute(0, 1, 3, 2)) * rgb_bg
+
+            return img
+
     def unproject_depth(self, depth, cam_K, cam_R):
         """
         Perform unprojection on given depth map.
@@ -200,9 +249,9 @@ class TextureFieldsCls(nn.Module):
 
         return coord, mask
 
-    def get_z_from_prior(self, size):
+    def get_z_from_prior(self):
         """
-        Draw latent code z from prior either by sampling distribution or MAP.
+        Draw latent code z from prior (standard normal) either by sampling or MAP.
 
         Args:
         - size (torch.Size): Size of sample to draw.
@@ -214,9 +263,24 @@ class TextureFieldsCls(nn.Module):
 
         if self.use_MAP:
             z = p0_z.mean
-            z = z.expand(*size, *z.size())
         else:
-            z = p0_z.sample(size)
+            z = p0_z.sample()
+        return z
 
+    def get_z_from_posterior(self, use_reparametrization=False):
+        """
+        Sample image latent vector z from posterior distribution q_z.
+
+        Args:
+        - is_differentiable (bool): Determines whether to use reparametrization trick during sampling.
+
+        Returns:
+        - z (torch.Tensor): Tensor of shape (B, z_dim). Batch of image latent vectors.
+        """
+        assert self.q_z is not None, "[!] Posterior must be set in advance for sampling"
+        if use_reparametrization:
+            z = self.q_z.rsample()
+        else:
+            z = self.q_z.sample()
         return z
 

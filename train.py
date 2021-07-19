@@ -21,7 +21,7 @@ parser = argparse.ArgumentParser(description="Training routine Texture Field")
 parser.add_argument(
     "--experiment_setting",
     type=str,
-    default="conditional",
+    default="vae",
     help="Toggle experiment settings. Can be one of 'conditional', 'vae', and 'gan'",
 )
 parser.add_argument("--no-cuda", type=bool, default=False, help="CUDA is not used when True")
@@ -318,7 +318,7 @@ def test_one_epoch(model, device, loader, writer, epoch):
         # forward propagation
         out = model(depth, cam_K, cam_R, pointcloud, condition_img, img)
 
-        gen_imgs = out["img_pred"]
+        gen_imgs = model.generate_images(depth, cam_K, cam_R, pointcloud)
 
         loss = out["loss"]
 
@@ -329,7 +329,8 @@ def test_one_epoch(model, device, loader, writer, epoch):
     writer.add_images("Generated Image/test", gen_imgs, epoch)
     writer.add_images("GT Image/test", img, epoch)
     writer.add_images("GT Depth/test", depth, epoch)
-    writer.add_images("GT Condition/test", condition_img, epoch)
+    if args.experiment_setting == "conditional":
+        writer.add_images("GT Condition/test", condition_img, epoch)
 
     avg_loss = test_loss / args.test_set_size
 

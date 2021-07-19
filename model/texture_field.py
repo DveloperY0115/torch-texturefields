@@ -18,37 +18,43 @@ from .texture_field_core import TextureFieldsCore
 from .gan_discriminator import TextureFieldsGANDiscriminator
 from .vae_encoder import TextureFieldsVAEEncoder
 
+
 class TextureFieldsCls(nn.Module):
-    def __init__(self, use_VAE=False, p_z=None, white_bg=True, use_MAP=False):
+    def __init__(self, mode, device, white_bg=True, use_MAP=False):
         """
         Constructor of TextureFieldsCls.
 
         Args:
-        - use_vae (bool): Determines whether to use VAE encoder or conditional image encoder.
-        - p_z (torch.Distribution): Initial probability distribution for variational inference.
+        - mode (str): String indicates which mode to use. Can be one of 'conditional', 'vae', and 'gan'.
+        - device (torch.device): Object representing currently used device.
         - white_bg (bool): Indicates whether the background of input images are white or not.
         - use_MAP (bool): Indicates whether to use MAP or sampling for variational inference.
         """
         super(TextureFieldsCls, self).__init__()
 
-        self.use_VAE = use_VAE
+        self.mode = mode
+        self.device = device
         self.white_bg = white_bg
         self.use_MAP = use_MAP
 
-        if self.use_VAE:
-            self.encoder = TextureFieldsVAEEncoder()
-            if p_z is None:
-                self.p_z = dist.Normal(torch.tensor([]), torch.tensor([]))
-            else:
-                self.p_z = p_z
-        else:
+        # set experimental setting specific submodules
+        if self.mode == "conditional":
             self.encoder = TextureFieldsImageEncoder(c_dim=512)
-            self.p_z = None
+        else:
+            if self.mode == "vae":
+                self.encoder = TextureFieldsVAEEncoder()
+            else:
+                # GAN
+                self.encoder = None
+                self.discriminator = TextureFieldsGANDiscriminator()
 
+        # initialize shape encoder
         self.shape_encoder = TextureFieldsShapeEncoder()
+
+        # initialize Texture Field core
         self.core = TextureFieldsCore(z_dim=512)
 
-    def forward(self, depth, cam_K, cam_R, geometry, condition):
+    def forward(self, depth, cam_K, cam_R, geometry, condition, real):
         """
         Forward propagation.
 
@@ -59,10 +65,12 @@ class TextureFieldsCls(nn.Module):
         - geometry (dict): Dictionary containing one or more geometric features of input shapes
                 - e.g. { 'points': (torch.Tensor / <B, 3, N>), 'normals': (torch.Tensor / <B, 3, N>)}
         - condition (torch.Tensor): Tensor of shape (B, 3, H, W). Batch of conditional images.
+        - real (torch.Tensor): Tensor of shape (B, 3, H, W). Batch of ground truth images.
 
         Returns:
-        - img (torch.Tensor): Tensor of shape (B, 3, H, W). 
-                Batch of RGB color coordinates at points obtained by unprojecting input image pixels.
+        - out (Dict): Dictionary containing outputs of model such as predicted image, loss, etc..
+            - out["img_pred"] (torch.Tensor): Tensor of shape (B, 3, H, W). Batch of predicted images
+            - out["loss"] (scalar): Computed loss. Can be used for back propagation later.
         """
         batch_size, _, W, H = depth.size()
         assert depth.size(1) == 1
@@ -71,17 +79,27 @@ class TextureFieldsCls(nn.Module):
 
         coord, mask = self.unproject_depth(depth, cam_K, cam_R)
 
-        # get image latent vector 'z' either by:
-        # (1) extracting it from given conditional image
-        # (2) variational inference (sampling from distribution or MAP)
-        if self.use_VAE:
-            z = self.get_z_from_prior((batch_size,))
-        else:
-            assert condition is not None, "Condition image must be provided when VAE is NOT used"
-            z = self.encoder(condition)
-
         # get shape latent vector 's'
         s = self.shape_encoder(geometry)
+
+        # get image latent vector 'z' either by:
+        if self.mode == "gan":
+            # (1) Sampling from prior 'p0_z'
+            z = self.get_z_from_prior((batch_size,))
+
+        else:
+            # (2) Infer from encoder
+            if self.mode == "conditional":
+                # conditional
+                assert (
+                    condition is not None
+                ), "[!] Condition image must be provided in conditional setting!"
+                z = self.encoder(condition)
+            else:
+                # VAE
+                mu, logvar = self.encoder(real, s)
+                q_z = dist.Normal(mu, torch.exp(logvar))
+                z = q_z.rsample()
 
         # infer color for each query points
         coord = coord.reshape(batch_size, 3, W * H)
@@ -94,9 +112,24 @@ class TextureFieldsCls(nn.Module):
         else:
             rgb_bg = torch.zeros_like(rgb)
 
+        # dictionary of outputs
+        out = {}
+
         img = (mask * rgb).permute(0, 1, 3, 2) + (1 - mask.permute(0, 1, 3, 2)) * rgb_bg
 
-        return img
+        out["img_pred"] = img
+
+        # compute experiment specific losses
+        if self.mode == "conditional":
+            out["loss"] = nn.L1Loss()(img, real)
+        elif self.mode == "vae":
+            p0_z = dist.Normal(torch.zeros(512).to(self.device), torch.ones(512).to(self.device))
+            reconstruction_loss = F.mse_loss(img, real).sum(dim=-1).mean()
+            kl = dist.kl_divergence(q_z, p0_z).sum(dim=-1).mean() / float(H * W * 3)
+            out["loss"] = reconstruction_loss + kl  # ELBO
+        else:
+            pass
+        return out
 
     # helper functions
     def unproject_depth(self, depth, cam_K, cam_R):
@@ -177,26 +210,13 @@ class TextureFieldsCls(nn.Module):
         Returns:
         -  z (torch.Tensor): Tensor of shape (*size, z.size). Latent code.
         """
+        p0_z = dist.Normal(torch.zeros(512).to(self._device), torch.ones(512).to(self._device))
 
         if self.use_MAP:
-            z = self.p_z.mean
+            z = p0_z.mean
             z = z.expand(*size, *z.size())
         else:
-            z = self.p_z.sample(size)
+            z = p0_z.sample(size)
 
         return z
 
-    def infer_z(self, image, s):
-        """
-        Make inference on the distribution of image latent vector 'z'.
-
-        Args:
-        - image (torch.Tensor): Tensor of shape (B, 3, H, W). Batch of images.
-        - s (torch.Tensor): Tensor of shape (B, out_dim). Batch of shape latent feature vectors corresponding to images.
-        """
-        if self.use_VAE:
-            mean_z, _ = self.encoder(image, s)
-        else:
-            batch_size = image.size(0)
-            mean_z = torch.empty(batch_size, 0, device=self._device)
-        return mean_z

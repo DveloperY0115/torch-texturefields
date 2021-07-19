@@ -21,12 +21,12 @@ parser = argparse.ArgumentParser(description="Training routine Texture Field")
 parser.add_argument(
     "--experiment_setting",
     type=str,
-    default="generative",
-    help="Toggle experiment settings. Can be either 'conditional' or 'generative'",
+    default="vae",
+    help="Toggle experiment settings. Can be one of 'conditional', 'vae', and 'gan'",
 )
 parser.add_argument("--no-cuda", type=bool, default=False, help="CUDA is not used when True")
 parser.add_argument(
-    "--device_id", type=int, default=0, help="CUDA device ID if multiple devices available"
+    "--device_id", type=int, default=1, help="CUDA device ID if multiple devices available"
 )
 parser.add_argument(
     "--use_multi_gpu", type=bool, default=False, help="Use multiple GPUs if available"
@@ -74,16 +74,14 @@ def main():
     writer = SummaryWriter(log_dir=log_dir)
 
     # define model, optimizer, and LR scheduler
-    if args.experiment_setting == "conditional":
-        model = TextureFieldsCls()
-    elif args.experiment_setting == "generative":
-        model = TextureFieldsCls()
+    if args.experiment_setting in ("conditional", "vae", "gan"):
+        model = TextureFieldsCls(args.experiment_setting, device).to(device)
     else:
         print(
-            "[!] Please provide valid argument. Experiment settings can either be 'conditional' or 'generative'"
+            "[!] Please provide valid argument. Experiment settings can be one of 'conditional', 'vae', and 'gan'"
         )
         return -1
-    model = model.to(device)
+    print("[!] Using experiment setting: {}".format(args.experiment_setting))
 
     # toggle data parallelism
     if args.use_multi_gpu:
@@ -259,17 +257,13 @@ def train_one_epoch(model, optimizer, scheduler, device, loader):
         pointcloud = torch.cat([p, n], dim=1)
 
         # forward propagation
-        img_pred = model(depth, cam_K, cam_R, pointcloud, condition_img)
+        out = model(depth, cam_K, cam_R, pointcloud, condition_img, img)
 
-        # calculate loss
-        loss = nn.L1Loss()(img_pred, img)
+        loss = out["loss"]
 
         # back propagation
         loss.backward()
         optimizer.step()
-
-        # update scheduler
-        # scheduler.step()
 
         train_loss += loss.item()
 
@@ -322,10 +316,11 @@ def test_one_epoch(model, device, loader, writer, epoch):
         pointcloud = torch.cat([p, n], dim=1)
 
         # forward propagation
-        gen_imgs = model(depth, cam_K, cam_R, pointcloud, condition_img)
+        out = model(depth, cam_K, cam_R, pointcloud, condition_img, img)
 
-        # calculate loss
-        loss = nn.L1Loss()(gen_imgs, img)
+        gen_imgs = out["img_pred"]
+
+        loss = out["loss"]
 
         test_loss += loss.item()
 

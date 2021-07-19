@@ -21,12 +21,12 @@ parser = argparse.ArgumentParser(description="Training routine Texture Field")
 parser.add_argument(
     "--experiment_setting",
     type=str,
-    default="vae",
+    default="conditional",
     help="Toggle experiment settings. Can be one of 'conditional', 'vae', and 'gan'",
 )
 parser.add_argument("--no-cuda", type=bool, default=False, help="CUDA is not used when True")
 parser.add_argument(
-    "--device_id", type=int, default=1, help="CUDA device ID if multiple devices available"
+    "--device_id", type=int, default=0, help="CUDA device ID if multiple devices available"
 )
 parser.add_argument(
     "--use_multi_gpu", type=bool, default=False, help="Use multiple GPUs if available"
@@ -396,13 +396,21 @@ def load_checkpoint(checkpoint_root, load_latest=True):
         return None
 
     checkpoint_files = glob.glob(os.path.join(checkpoint_root, "*.{}".format("tar")))
-    checkpoint_files.sort()
 
     if len(checkpoint_files) == 0:
         print("[!] No checkpoint loaded")
         return None
 
-    latest_checkpoint = checkpoint_files[-1]
+    sorted_files = {}
+
+    for file in checkpoint_files:
+        filename, _ = file.split(".")
+        _, _, epoch = filename.split("-")
+        sorted_files[int(epoch)] = file
+
+    max_epoch = max(sorted_files.keys())
+
+    latest_checkpoint = sorted_files[max_epoch]
 
     print("[!] Loading the latest checkpoint {}".format(latest_checkpoint))
     return torch.load(latest_checkpoint)

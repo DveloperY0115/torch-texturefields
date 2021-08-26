@@ -18,7 +18,7 @@ class TextureFieldsShapeEncoder(nn.Module):
         - hidden_dim (int): Dimensionality of hidden feature vector within this ResNet block. Set to 128 by default.
         - L (int): Number of ResNet-like blocks. Set to 4 by default.
         """
-        super().__init__()
+        super(TextureFieldsShapeEncoder, self).__init__()
 
         self.L = L
 
@@ -69,7 +69,7 @@ class PointNetResNetBlock(nn.Module):
         Args:
         - hidden_dim (int): Dimensionality of hidden feature. Set to 128 by default.
         """
-        super().__init__()
+        super(PointNetResNetBlock, self).__init__()
 
         self.fc_1 = nn.Conv1d(2 * hidden_dim, hidden_dim, 1)
         self.fc_2 = nn.Conv1d(hidden_dim, hidden_dim, 1)

@@ -1,5 +1,5 @@
 """
-pipeline.py - Entire Texture Fields pipeline
+texture_field.py - Entire Texture Fields pipeline
 
 (Texture Fields: Learning Texture Representations in Function Space, Oechsle et al., ICCV 2019)
 """
@@ -18,37 +18,51 @@ from .texture_field_core import TextureFieldsCore
 from .gan_discriminator import TextureFieldsGANDiscriminator
 from .vae_encoder import TextureFieldsVAEEncoder
 
+
 class TextureFieldsCls(nn.Module):
-    def __init__(self, use_VAE=False, p_z=None, white_bg=True, use_MAP=False):
+    def __init__(self, mode, device, white_bg=True, use_MAP=False, **kwargs):
         """
         Constructor of TextureFieldsCls.
 
         Args:
-        - use_vae (bool): Determines whether to use VAE encoder or conditional image encoder.
-        - p_z (torch.Distribution): Initial probability distribution for variational inference.
+        - mode (str): String indicates which mode to use. Can be one of 'conditional', 'vae', and 'gan'.
+        - device (torch.device): Object representing currently used device.
         - white_bg (bool): Indicates whether the background of input images are white or not.
         - use_MAP (bool): Indicates whether to use MAP or sampling for variational inference.
         """
-        super(TextureFieldsCls, self).__init__()
+        super().__init__()
 
-        self.use_VAE = use_VAE
+        self.mode = mode
+        self.device = device
         self.white_bg = white_bg
         self.use_MAP = use_MAP
 
-        if self.use_VAE:
-            self.encoder = TextureFieldsVAEEncoder()
-            if p_z is None:
-                self.p_z = dist.Normal(torch.tensor([]), torch.tensor([]))
-            else:
-                self.p_z = p_z
-        else:
-            self.encoder = TextureFieldsImageEncoder(c_dim=512)
-            self.p_z = None
+        # initialize posterior distribution
+        if self.mode == "vae":
+            self.q_z = None
 
+        # set experimental setting specific submodules
+        if self.mode == "conditional":
+            self.encoder = TextureFieldsImageEncoder(c_dim=512)
+        else:
+            if self.mode == "vae":
+                self.encoder = TextureFieldsVAEEncoder()
+
+                if "beta" in kwargs.keys():
+                    assert kwargs["beta"] is not None, "[!] Please provide valid value for beta"
+                    self.beta = kwargs["beta"]
+                else:
+                    self.beta = 1.0
+            else:  # GAN
+                self.encoder = None
+
+        # initialize shape encoder
         self.shape_encoder = TextureFieldsShapeEncoder()
+
+        # initialize Texture Field core
         self.core = TextureFieldsCore(z_dim=512)
 
-    def forward(self, depth, cam_K, cam_R, geometry, condition):
+    def forward(self, depth, cam_K, cam_R, geometry, condition, real):
         """
         Forward propagation.
 
@@ -59,33 +73,46 @@ class TextureFieldsCls(nn.Module):
         - geometry (dict): Dictionary containing one or more geometric features of input shapes
                 - e.g. { 'points': (torch.Tensor / <B, 3, N>), 'normals': (torch.Tensor / <B, 3, N>)}
         - condition (torch.Tensor): Tensor of shape (B, 3, H, W). Batch of conditional images.
+        - real (torch.Tensor): Tensor of shape (B, 3, H, W). Batch of ground truth images.
 
         Returns:
-        - img (torch.Tensor): Tensor of shape (B, 3, H, W). 
-                Batch of RGB color coordinates at points obtained by unprojecting input image pixels.
+        - out (Dict): Dictionary containing outputs of model such as predicted image, loss, etc..
+            - out["img_pred"] (torch.Tensor): Tensor of shape (B, 3, H, W). Batch of predicted images
+            - out["loss"] (scalar): Computed loss. Can be used for back propagation later.
+            NOTE: For GAN training, this method doesn't return loss!
         """
         batch_size, _, W, H = depth.size()
-        assert depth.size(1) == 1
+        assert (
+            depth.size(1) == 1
+        ), "[!] Invalid dimension for depth map. Expected the number of channels to be one but got {}".format(
+            depth.shape
+        )
         assert cam_K.size() == (batch_size, 3, 4)
         assert cam_R.size() == (batch_size, 3, 4)
 
-        coord, mask = self.unproject_depth(depth, cam_K, cam_R)
+        coord, mask = unproject_depth(depth, cam_K, cam_R)
 
-        # get image latent vector 'z' either by:
-        # (1) extracting it from given conditional image
-        # (2) variational inference (sampling from distribution or MAP)
-        if self.use_VAE:
-            z = self.get_z_from_prior((batch_size,))
-        else:
-            assert condition is not None, "Condition image must be provided when VAE is NOT used"
-            z = self.encoder(condition)
+        coord = coord.reshape(batch_size, 3, W * H)  # (B, 3, H, W) -> (B, 3, H * W)
+        coord = coord.transpose(1, 2)  # (B, 3, H * W) -> (B, H * W, 3)
 
         # get shape latent vector 's'
         s = self.shape_encoder(geometry)
 
+        # get image latent vector 'z'
+        if self.mode == "gan":
+            z = self.get_z_from_prior(batch_size)
+        else:
+            if self.mode == "conditional":
+                assert (
+                    condition is not None
+                ), "[!] Condition image must be provided in conditional setting!"
+                z = self.encoder(condition)
+            else:  # VAE
+                mu, logvar = self.encoder(real, s)
+                self.q_z = dist.Normal(mu, torch.exp(logvar))  # update posterior
+                z = self.q_z.rsample()
+
         # infer color for each query points
-        coord = coord.reshape(batch_size, 3, W * H)
-        coord = coord.transpose(1, 2)
         rgb = self.core(coord, z, s)
         rgb = rgb.view(batch_size, 3, W, H)
 
@@ -94,82 +121,78 @@ class TextureFieldsCls(nn.Module):
         else:
             rgb_bg = torch.zeros_like(rgb)
 
+        # dictionary of outputs
+        out = {}
+
         img = (mask * rgb).permute(0, 1, 3, 2) + (1 - mask.permute(0, 1, 3, 2)) * rgb_bg
 
-        return img
+        out["img_pred"] = img
+
+        # compute experiment specific losses
+        if self.mode == "conditional":
+            out["loss"] = nn.L1Loss()(img, real)
+        elif self.mode == "vae":
+            p0_z = dist.Normal(torch.zeros(512).to(self.device), torch.ones(512).to(self.device))
+            reconstruction_loss = F.mse_loss(img, real).sum(dim=-1).mean()
+            kl = dist.kl_divergence(self.q_z, p0_z).sum(dim=-1).mean() / float(H * W * 3)
+            out["loss"] = reconstruction_loss + self.beta * kl  # ELBO
+            out["kl"] = kl
+            out["reconstruction"] = reconstruction_loss
+        else:  # GAN
+            out["loss"] = None  # Loss is computed outside 'forward' method - see 'train.py'
+        return out
 
     # helper functions
-    def unproject_depth(self, depth, cam_K, cam_R):
+    def generate_images(self, depth, cam_K, cam_R, geometry):
         """
-        Perform unprojection on given depth map.
+        Generate images given coordinates in 3D space and shape latent code.
+        Used for image generation at test time.
 
         Args:
         - depth (torch.Tensor): Tensor of shape (B, 1, H, W). Batch of depth maps.
         - cam_K (torch.Tensor): Tensor of shape (B, 3, 4). Batch of camera projection matrices.
         - cam_R (torch.Tensor): Tensor of shape (B, 3, 4). Batch of camera matrices representing camera's translation and rotation.
+        - geometry (dict): Dictionary containing one or more geometric features of input shapes
+                - e.g. { 'points': (torch.Tensor / <B, 3, N>), 'normals': (torch.Tensor / <B, 3, N>)}
 
         Returns:
-        - coord (torch.Tensor): Tensor of shape (B, 3, H, W). 
-                Coordinates obtained by unprojecting given images with camera parameters and extrinsic.
-        - mask (torch.Tensor): Tensor of shape (B, 1, H, W). Mask indicating the pixels with finite depth values.
+        - img (torch.Tensor): Tensor of shape (B, 3, H, W). Batch of generated images.
         """
+        with torch.no_grad():
+            assert (
+                self.mode != "conditional"
+            ), "[!] Conditional model cannot be used for image generation!"
 
-        assert depth.size(1) == 1
-        batch_size, _, H, W = depth.size()
-        device = depth.device
+            batch_size, _, W, H = depth.size()
+            assert depth.size(1) == 1
+            assert cam_K.size() == (batch_size, 3, 4)
+            assert cam_R.size() == (batch_size, 3, 4)
 
-        depth = torch.permute(depth, (0, 1, 3, 2))  # (B, 1, H, W) -> (B, 1, W, H)
-        depth = -depth  # reverse the sign of depth (Negative in OpenGL by default)
+            coord, mask = unproject_depth(depth, cam_K, cam_R)
 
-        affine_fourth_row = torch.tensor([0.0, 0.0, 0.0, 1.0])
-        affine_fourth_row = affine_fourth_row.expand((batch_size, 1, 4)).to(device)
+            coord = coord.reshape(batch_size, 3, W * H)  # (B, 3, H, W) -> (B, 3, H * W)
+            coord = coord.transpose(1, 2)  # (B, 3, H * W) -> (B, H * W, 3)
 
-        # add fourth row to camera (extrinsic) matrices
-        cam_R = torch.cat((cam_R, affine_fourth_row), dim=1)
+            # get shape latent vector 's'
+            s = self.shape_encoder(geometry)
 
-        # build mask indicating pixels with valid depth values (i.e. mapped from object, not background)
-        mask = (~torch.isinf(depth)).float()
-        depth[torch.isinf(depth)] = 0
+            z = self.get_z_from_prior(batch_size)
 
-        d = depth.reshape(batch_size, 1, W * H)
+            rgb = self.core(coord, z, s)
+            rgb = rgb.view(batch_size, 3, W, H)
 
-        # create tensor for pixel locations
-        pixel_x, pixel_y = torch.meshgrid([torch.arange(0, H), torch.arange(0, W)])
-        pixel_x, pixel_y = pixel_x.to(device), pixel_y.to(device)
-        pixels = torch.cat(
-            (
-                pixel_x.expand(batch_size, 1, pixel_x.size(0), pixel_x.size(1)),
-                (W - pixel_y).expand(
-                    batch_size, 1, pixel_y.size(0), pixel_y.size(1)
-                ),  # reverse the index for height
-            ),
-            dim=1,
-        )
-        pixels = pixels.reshape(batch_size, 2, pixel_y.size(0) * pixel_y.size(1))
-        pixels = pixels.float() / W * 2
+            if self.white_bg:
+                rgb_bg = torch.ones_like(rgb)
+            else:
+                rgb_bg = torch.zeros_like(rgb)
 
-        # create terms of mapping equation x = P^-1 * d*(qp - b)
-        P = cam_K[:, :2, :2].float().to(device)
-        q = cam_K[:, 2:3, 2:3].float().to(device)
-        b = cam_K[:, :2, 2:3].expand(batch_size, 2, d.size(2)).to(device)
-        inv_P = torch.inverse(P).to(device)
+            img = (mask * rgb).permute(0, 1, 3, 2) + (1 - mask.permute(0, 1, 3, 2)) * rgb_bg
 
-        operand = (pixels.float() * q.float() - b.float()) * d.float()
-        x_xy = torch.bmm(inv_P, operand)
+            return img
 
-        x_world = torch.cat((x_xy, d, torch.ones_like(d)), dim=1)
-
-        inv_R = torch.inverse(cam_R)
-        coord = torch.bmm(inv_R.expand(batch_size, 4, 4), x_world).reshape(batch_size, 4, H, W)
-
-        coord = coord[:, :3].to(device)
-        mask = mask.to(device)
-
-        return coord, mask
-
-    def get_z_from_prior(self, size):
+    def get_z_from_prior(self, batch_size):
         """
-        Draw latent code z from prior either by sampling distribution or MAP.
+        Draw latent code z from prior (standard normal) either by sampling or MAP.
 
         Args:
         - size (torch.Size): Size of sample to draw.
@@ -177,26 +200,102 @@ class TextureFieldsCls(nn.Module):
         Returns:
         -  z (torch.Tensor): Tensor of shape (*size, z.size). Latent code.
         """
+        p0_z = dist.Normal(
+            torch.zeros(batch_size, 512).to(self.device),
+            torch.ones(batch_size, 512).to(self.device),
+        )
 
         if self.use_MAP:
-            z = self.p_z.mean
-            z = z.expand(*size, *z.size())
+            z = p0_z.mean
         else:
-            z = self.p_z.sample(size)
-
+            z = p0_z.sample()
         return z
 
-    def infer_z(self, image, s):
+    def get_z_from_posterior(self, use_reparametrization=False):
         """
-        Make inference on the distribution of image latent vector 'z'.
+        Sample image latent vector z from posterior distribution q_z.
 
         Args:
-        - image (torch.Tensor): Tensor of shape (B, 3, H, W). Batch of images.
-        - s (torch.Tensor): Tensor of shape (B, out_dim). Batch of shape latent feature vectors corresponding to images.
+        - is_differentiable (bool): Determines whether to use reparametrization trick during sampling.
+
+        Returns:
+        - z (torch.Tensor): Tensor of shape (B, z_dim). Batch of image latent vectors.
         """
-        if self.use_VAE:
-            mean_z, _ = self.encoder(image, s)
+        assert self.q_z is not None, "[!] Posterior must be set in advance for sampling"
+        if use_reparametrization:
+            z = self.q_z.rsample()
         else:
-            batch_size = image.size(0)
-            mean_z = torch.empty(batch_size, 0, device=self._device)
-        return mean_z
+            z = self.q_z.sample()
+        return z
+
+
+def unproject_depth(depth, cam_K, cam_R):
+    """
+    Perform unprojection on given depth map.
+
+    Args:
+    - depth (torch.Tensor): Tensor of shape (B, 1, H, W). Batch of depth maps.
+    - cam_K (torch.Tensor): Tensor of shape (B, 3, 4). Batch of camera projection matrices.
+    - cam_R (torch.Tensor): Tensor of shape (B, 3, 4). Batch of camera matrices representing camera's translation and rotation.
+    
+    Returns:
+    - coord (torch.Tensor): Tensor of shape (B, 3, W, H). 
+            Coordinates obtained by unprojecting given images with camera parameters and extrinsic.
+    - mask (torch.Tensor): Tensor of shape (B, 1, W, H). Mask indicating the pixels with finite depth values.
+    """
+
+    assert depth.size(1) == 1, "[!] Expected depth map of shape (B, 1, H, W), got {}".format(
+        depth.size()
+    )
+    batch_size, _, H, W = depth.size()
+    device = depth.device
+
+    depth = torch.permute(depth, (0, 1, 3, 2))  # (B, 1, H, W) -> (B, 1, W, H)
+    depth = -depth  # reverse the sign of depth (Negative in OpenGL by default)
+
+    affine_fourth_row = torch.tensor([0.0, 0.0, 0.0, 1.0])
+    affine_fourth_row = affine_fourth_row.expand((batch_size, 1, 4)).to(device)
+
+    # add fourth row to camera (extrinsic) matrices
+    cam_R = torch.cat((cam_R, affine_fourth_row), dim=1)
+
+    # build mask indicating pixels with valid depth values (i.e. mapped from object, not background)
+    mask = (~torch.isinf(depth)).float()
+    depth[torch.isinf(depth)] = 0
+    depth[torch.isnan(depth)] = 0
+
+    d = depth.reshape(batch_size, 1, W * H)
+
+    # create tensor for pixel locations
+    pixel_x, pixel_y = torch.meshgrid([torch.arange(0, H), torch.arange(0, W)])
+    pixel_x, pixel_y = pixel_x.to(device), pixel_y.to(device)
+    pixels = torch.cat(
+        (
+            pixel_x.expand(batch_size, 1, pixel_x.size(0), pixel_x.size(1)),
+            (W - pixel_y).expand(
+                batch_size, 1, pixel_y.size(0), pixel_y.size(1)
+            ),  # reverse the index for height
+        ),
+        dim=1,
+    )
+    pixels = pixels.reshape(batch_size, 2, pixel_y.size(0) * pixel_y.size(1))
+    pixels = pixels.float() / W * 2
+
+    # create terms of mapping equation x = P^-1 * d*(qp - b)
+    P = cam_K[:, :2, :2].float().to(device)
+    q = cam_K[:, 2:3, 2:3].float().to(device)
+    b = cam_K[:, :2, 2:3].expand(batch_size, 2, d.size(2)).to(device)
+    inv_P = torch.inverse(P).to(device)
+
+    operand = (pixels.float() * q.float() - b.float()) * d.float()
+    x_xy = torch.bmm(inv_P, operand)
+
+    x_world = torch.cat((x_xy, d, torch.ones_like(d)), dim=1)
+
+    inv_R = torch.inverse(cam_R)
+    coord = torch.bmm(inv_R.expand(batch_size, 4, 4), x_world).reshape(batch_size, 4, H, W)
+
+    coord = coord[:, :3].to(device)
+    mask = mask.to(device)
+
+    return coord, mask

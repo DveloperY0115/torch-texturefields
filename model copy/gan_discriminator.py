@@ -14,7 +14,7 @@ class TextureFieldsGANDiscriminator(nn.Module):
         """
 
         """
-        super().__init__()
+        super(TextureFieldsGANDiscriminator, self).__init__()
 
         self.conv_in = nn.Conv2d(4, 32, kernel_size=(1, 1), stride=(1, 1))
         self.resnet_blocks = nn.ModuleList(

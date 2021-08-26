@@ -21,7 +21,7 @@ class TextureFieldsImageEncoder(nn.Module):
         - normalize (bool): Indicator for input normalization.
         - use_linear (bool): Indicator for using fully connected layer as output layer.
         """
-        super().__init__()
+        super(TextureFieldsImageEncoder, self).__init__()
 
         self.normalize = normalize
         self.use_linear = use_linear

@@ -17,7 +17,7 @@ class TextureFieldsCore(nn.Module):
         - s_dim (int): Dimensionality of shape feature vector (or tensor). Set to 512 by default.
         - L (int): Number of ResNet-like blocks in the pipeline. Set to 6 by default.
         """
-        super().__init__()
+        super(TextureFieldsCore, self).__init__()
 
         self.z_dim = z_dim
         self.s_dim = s_dim
@@ -68,7 +68,7 @@ class TextureFieldsCoreResNetBlock(nn.Module):
         - s_dim (torch.Tensor): Dimensionality of shape feature vector (or tensor). Set to 512 by default.
         - hidden_dim (torch.Tensor): Dimensionality of hidden feature vector (or tensor) within this block. Set to 128 by default.
         """
-        super().__init__()
+        super(TextureFieldsCoreResNetBlock, self).__init__()
 
         self.fc_1 = nn.Linear(z_dim + s_dim, hidden_dim)
         self.fc_2 = nn.Conv1d(hidden_dim, hidden_dim, 1)

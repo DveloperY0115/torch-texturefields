@@ -16,7 +16,7 @@ class TextureFieldsResNetBlock(nn.Module):
         - in_channel (int): Number of channels of input feature map. Then its shape becomes (B, in_channel, H, W)
         - out_channel (int): Number of channels of output feature map. Then its shape becomes (B, out_channel, H, W)
         """
-        super().__init__()
+        super(TextureFieldsResNetBlock, self).__init__()
 
         self.conv_1 = nn.Conv2d(in_channel, in_channel, kernel_size=(1, 1), stride=(1, 1))
         self.conv_2 = nn.Conv2d(in_channel, in_channel, kernel_size=(1, 1), stride=(1, 1))
@@ -56,7 +56,7 @@ class TextureFieldsResNetBlockPointwise(nn.Module):
         - factor (float): Weight for skip connection. Set to 1 by default.
         - use_leaky (bool): Determines whether to use leaky ReLU or ReLU. Set to False by default.
         """
-        super().__init__()
+        super(TextureFieldsResNetBlockPointwise, self).__init__()
 
         self.factor = factor
         self.use_leaky = use_leaky

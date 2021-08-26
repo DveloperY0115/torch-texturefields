@@ -17,7 +17,7 @@ class TextureFieldsVAEEncoder(nn.Module):
         Args:
         - s_dim (int): Dimensionality of shape feature vector (or tensor). Set to 512 by default.
         """
-        super().__init__()
+        super(TextureFieldsVAEEncoder, self).__init__()
 
         self.fc_feature = nn.Linear(s_dim, 32)
 

@@ -5,9 +5,6 @@ train.py
 import os
 import sys
 import argparse
-from collections import namedtuple
-
-from yaml import parse
 
 sys.path.append(".")
 sys.path.append("..")

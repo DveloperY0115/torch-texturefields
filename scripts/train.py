@@ -19,7 +19,7 @@ parser = argparse.ArgumentParser()
 # ----- CUDA -----
 parser.add_argument("--no-cuda", type=bool, default=False, help="CUDA is not used when True")
 parser.add_argument(
-    "--device_id", type=int, default=6, help="CUDA device ID if multiple devices available"
+    "--device_id", type=int, default=2, help="CUDA device ID if multiple devices available"
 )
 parser.add_argument(
     "--use_multi_gpu", type=bool, default=False, help="Use multiple GPUs if available"
@@ -52,7 +52,7 @@ parser.add_argument(
     "--out_dir", type=str, default="out", help="Directory where the outputs will be saved"
 )
 parser.add_argument(
-    "--log_wandb", type=bool, default=False, help="Determine whether to log the run using W&B"
+    "--log_wandb", type=bool, default=True, help="Determine whether to log the run using W&B"
 )
 parser.add_argument(
     "--save_period", type=int, default=100, help="Number of epochs between checkpoints"

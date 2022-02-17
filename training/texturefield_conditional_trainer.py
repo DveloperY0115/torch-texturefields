@@ -47,10 +47,12 @@ class TextureFieldsConditionalTrainer(BaseTrainer):
 
         # initialize W&B if requested
         if self.opts.log_wandb:
-            wandb.init(project="Research-{}".format(self.opts.dataset_type))
+            wandb.init(project="torch-TextureFields")
 
     def train(self):
-        for self.epoch in range(self.initial_epoch, self.opts.num_epoch):
+        print("Begin training..")
+
+        for self.epoch in tqdm(range(self.initial_epoch, self.opts.num_epoch)):
             train_loss = self.train_one_epoch()
             test_loss = self.test_one_epoch()
 
@@ -72,16 +74,8 @@ class TextureFieldsConditionalTrainer(BaseTrainer):
         Train the model for one epoch.
         """
         train_loss = 0
-
-        train_iter = iter(self.train_loader)
-
-        for _ in tqdm(range(self.opts.num_iter)):
-            try:
-                train_batch = next(train_iter)
-            except StopIteration:
-                train_iter = iter(self.train_loader)
-                train_batch = next(train_iter)
-
+        
+        for train_batch in self.train_loader:
             # initialize gradient
             self.optimizer.zero_grad()
 
@@ -128,13 +122,7 @@ class TextureFieldsConditionalTrainer(BaseTrainer):
             test_loss = 0
             gen_imgs = None
 
-            test_iter = iter(self.test_loader)
-            while True:
-                try:
-                    test_batch = next(test_iter)
-                except StopIteration:
-                    break
-
+            for test_batch in self.test_loader:
                 # parse batch
                 img, depth, camera_params, condition_img, pointcloud = test_batch
                 cam_K = camera_params["K"]

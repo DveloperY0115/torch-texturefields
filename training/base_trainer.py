@@ -165,7 +165,7 @@ class BaseTrainer:
 
         self.initial_epoch = checkpoint["epoch"]
 
-        self.model = self.model.load_state_dict(checkpoint["model_state_dict"])
+        self.model.load_state_dict(checkpoint["model_state_dict"])
         self.model.train()
         self.optimizer = self.optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
 

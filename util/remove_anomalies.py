@@ -8,7 +8,7 @@ import shutil
 
 
 def main():
-    dataset_dir = "data/shapenet/synthetic_cars_nospecular"
+    dataset_dir = "./data/shapenet/synthetic_cars_nospecular"
 
     samples = os.listdir(dataset_dir)
 

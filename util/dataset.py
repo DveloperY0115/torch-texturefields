@@ -7,6 +7,7 @@ import yaml
 import random
 import glob
 import imageio
+imageio.plugins.freeimage.download()
 import numpy as np
 
 import torch
@@ -263,7 +264,7 @@ def load_depth_map(filename, transform=None):
     Returns:
     - depth (torch.Tensor): Tensor of shape (1, H, W).
     """
-    depth = imageio.imread(filename)
+    depth = imageio.imread(filename, format="EXR-FI")
     depth = np.asarray(depth)
 
     if transform is not None:

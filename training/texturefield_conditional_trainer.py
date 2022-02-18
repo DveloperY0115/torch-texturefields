@@ -162,11 +162,12 @@ class TextureFieldsConditionalTrainer(BaseTrainer):
                     depth = depth.type(torch.uint8)
                     depth = depth.permute(0, 2, 3, 1).cpu().numpy()
 
+                    # log only 5 images out of other samples
                     log_dict = {
-                        "Images/GT": [wandb.Image(x) for x in img],
-                        "Images/Predicted-Generated": [wandb.Image(x) for x in gen_imgs],
-                        "Images/Depth": [wandb.Image(x) for x in depth],
-                        "Images/Condition": [wandb.Image(x) for x in condition_img]
+                        "Images/GT": [wandb.Image(x) for x in img[:5]],
+                        "Images/Predicted-Generated": [wandb.Image(x) for x in gen_imgs[:5]],
+                        "Images/Depth": [wandb.Image(x) for x in depth[:5]],
+                        "Images/Condition": [wandb.Image(x) for x in condition_img[:5]]
                     }
 
                     wandb.log(log_dict, step=self.epoch)

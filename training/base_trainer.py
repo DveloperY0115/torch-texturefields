@@ -27,7 +27,7 @@ class BaseTrainer:
             self.opts.out_dir, self.opts.dataset_type
         )
 
-        self.device = self.configure_device(self.opts.no_cuda)
+        self.device = self.configure_device()
 
     def train(self):
         """
@@ -49,7 +49,7 @@ class BaseTrainer:
 
     # Helper functions for configuring the trainer
 
-    def configure_device(self, no_cuda: bool = False) -> torch.device:
+    def configure_device(self) -> torch.device:
         """
         Configure which device to run training on.
         Inform users various tips based on the status of their machine.
@@ -62,12 +62,22 @@ class BaseTrainer:
         """
 
         print("======== Device Configuration ========")
-        device = torch.device(
-            "cuda" if torch.cuda.is_available() and not no_cuda else "cpu"
-        )
+        if self.opts.no_cuda :
+            device = torch.device("cpu")
+        else:
+            if not torch.cuda.is_available():
+                print("[!] System does not support CUDA acceleration. Falling back to CPU..")
+                device = torch.device("cpu")
+            elif len(self.opts.device_ids) == 0:
+                print("[!] No device is specified. Falling back to CPU..")
+                device = torch.device("cpu")
+            else:
+                device = torch.device(
+                    "cuda:{}".format(self.opts.device_ids[0]),  # set the first device in 'device_ids' as main
+                )
         print("[!] Using {} as default device".format(device))
 
-        if torch.cuda.is_available() and no_cuda:
+        if torch.cuda.is_available() and self.opts.no_cuda:
             print("[!] Your system is capable of GPU computing but is set not to use it.")
             print("[!] It's highly recommended to use GPUs for training!")
 

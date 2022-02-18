@@ -248,7 +248,7 @@ class TextureFieldsConditionalTrainer(BaseTrainer):
     def configure_dataset(self) -> Tuple[torch.utils.data.Dataset, torch.utils.data.Dataset]:
         if self.opts.dataset_type == "shapenet":
             dataset = ShapeNetSingleClassDataset(
-                "./data/shapenet/synthetic_cars_nospecular", img_size=128, num_pc_samples=2048
+                self.opts.dataset_dir, img_size=128, num_pc_samples=2048
             )
             print("[!] Dataset used: ShapeNet")
         else:

@@ -28,6 +28,7 @@ parser.add_argument(
     default="shapenet",
     help="Name of the dataset to be used. Can be one of 'shapenet' or 'pix3d'",
 )
+parser.add_argument("--dataset_dir", type=str, required=True)
 parser.add_argument("--batch_size", type=int, default=256, help="Size of a batch")
 parser.add_argument("--test_dataset_size", type=int, default=300, help="Cardinality of test set")
 

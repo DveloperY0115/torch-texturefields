@@ -20,20 +20,18 @@ from .vae_encoder import TextureFieldsVAEEncoder
 
 
 class TextureFieldsCls(nn.Module):
-    def __init__(self, mode, device, white_bg=True, use_MAP=False, **kwargs):
+    def __init__(self, mode, white_bg=True, use_MAP=False, **kwargs):
         """
         Constructor of TextureFieldsCls.
 
         Args:
         - mode (str): String indicates which mode to use. Can be one of 'conditional', 'vae', and 'gan'.
-        - device (torch.device): Object representing currently used device.
         - white_bg (bool): Indicates whether the background of input images are white or not.
         - use_MAP (bool): Indicates whether to use MAP or sampling for variational inference.
         """
         super().__init__()
 
         self.mode = mode
-        self.device = device
         self.white_bg = white_bg
         self.use_MAP = use_MAP
 
@@ -132,7 +130,7 @@ class TextureFieldsCls(nn.Module):
         if self.mode == "conditional":
             out["loss"] = nn.L1Loss()(img, real)
         elif self.mode == "vae":
-            p0_z = dist.Normal(torch.zeros(512).to(self.device), torch.ones(512).to(self.device))
+            p0_z = dist.Normal(torch.zeros(512).to(self._get_device_info()), torch.ones(512).to(self._get_device_info()))
             reconstruction_loss = F.mse_loss(img, real).sum(dim=-1).mean()
             kl = dist.kl_divergence(self.q_z, p0_z).sum(dim=-1).mean() / float(H * W * 3)
             out["loss"] = reconstruction_loss + self.beta * kl  # ELBO
@@ -201,8 +199,8 @@ class TextureFieldsCls(nn.Module):
         -  z (torch.Tensor): Tensor of shape (*size, z.size). Latent code.
         """
         p0_z = dist.Normal(
-            torch.zeros(batch_size, 512).to(self.device),
-            torch.ones(batch_size, 512).to(self.device),
+            torch.zeros(batch_size, 512).to(self._get_device_info()),
+            torch.ones(batch_size, 512).to(self._get_device_info()),
         )
 
         if self.use_MAP:
@@ -228,6 +226,9 @@ class TextureFieldsCls(nn.Module):
             z = self.q_z.sample()
         return z
 
+    def _get_device_info(self):
+        param = next(self.encoder.parameters())
+        return param.device
 
 def unproject_depth(depth, cam_K, cam_R):
     """
@@ -299,3 +300,4 @@ def unproject_depth(depth, cam_K, cam_R):
     mask = mask.to(device)
 
     return coord, mask
+

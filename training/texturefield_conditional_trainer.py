@@ -108,7 +108,7 @@ class TextureFieldsConditionalTrainer(BaseTrainer):
 
             train_loss += loss.item()
 
-        train_loss /= self.opts.batch_size
+        train_loss /= len(self.train_dataset)
 
         return train_loss
 
@@ -117,7 +117,7 @@ class TextureFieldsConditionalTrainer(BaseTrainer):
         Test the model every epoch.
         """
         with torch.no_grad():
-            test_loss = 0
+            test_loss = 0.0
             gen_imgs = None
 
             for test_batch in self.test_loader:
@@ -172,7 +172,7 @@ class TextureFieldsConditionalTrainer(BaseTrainer):
 
                     wandb.log(log_dict, step=self.epoch)
 
-        test_loss /= self.opts.test_dataset_size
+        test_loss /= len(self.test_dataset)
 
         return test_loss
 

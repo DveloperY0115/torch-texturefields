@@ -25,10 +25,10 @@ class TextureFieldsConditionalTrainer(BaseTrainer):
     def __init__(self, opts: namedtuple, checkpoint: str = None):
         super().__init__(opts=opts)
 
-        self.model = TextureFieldsCls(self.opts.experiment_setting, self.device).to(self.device)
+        self.model = TextureFieldsCls(self.opts.experiment_setting).to(self.device)
 
-        if self.opts.use_multi_gpu:
-            self.model = nn.DataParallel(self.model)
+        print("[!] Using device(s): ", self.opts.device_ids)
+        self.model = nn.DataParallel(self.model, opts.device_ids)
 
         # optimizer & learning rate scheduler
         self.optimizer = self.configure_optimizer()
@@ -100,9 +100,7 @@ class TextureFieldsConditionalTrainer(BaseTrainer):
             out = self.model(depth, cam_K, cam_R, pointcloud, condition_img, img)
 
             loss = out["loss"]
-
-            if self.opts.use_multi_gpu:
-                loss = loss.mean()
+            loss = loss.mean()
 
             # back prop
             loss.backward()
@@ -145,9 +143,7 @@ class TextureFieldsConditionalTrainer(BaseTrainer):
 
                 gen_imgs = out["img_pred"]
                 loss = out["loss"]
-
-                if self.opts.use_multi_gpu:
-                    loss = loss.mean()
+                loss = loss.mean()
 
                 test_loss += loss.item()
     
@@ -216,6 +212,7 @@ class TextureFieldsConditionalTrainer(BaseTrainer):
                 gt_imgs = img
                 gen_imgs = out["img_pred"]
                 loss = out["loss"]
+                loss = loss.mean()
 
                 # log images and loss
                 for gt, fake in zip(gt_imgs, gen_imgs):
@@ -275,7 +272,7 @@ class TextureFieldsConditionalTrainer(BaseTrainer):
             batch_size=self.opts.batch_size,
             shuffle=True,
             num_workers=self.opts.num_workers,
-            drop_last=True,
+            drop_last=False,
         )
 
         test_loader = data.DataLoader(
@@ -283,7 +280,7 @@ class TextureFieldsConditionalTrainer(BaseTrainer):
             batch_size=self.opts.batch_size, 
             shuffle=False,
             num_workers=self.opts.num_workers // 2 if self.opts.num_workers > 1 else 1,
-            drop_last=True,
+            drop_last=False,
         )
 
         return train_loader, test_loader

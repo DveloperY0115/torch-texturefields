@@ -132,9 +132,7 @@ class BaseTrainer:
         checkpoint = {}
 
         checkpoint["epoch"] = self.epoch
-        checkpoint["model_state_dict"] = (
-            self.model.module.state_dict() if self.opts.use_multi_gpu else self.model.state_dict()
-        )
+        checkpoint["model_state_dict"] = self.model.module.state_dict()
         checkpoint["optimizer_state_dict"] = self.optimizer.state_dict()
 
         if self.lr_scheduler is not None:

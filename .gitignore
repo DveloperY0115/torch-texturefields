@@ -148,7 +148,8 @@ cython_debug/
 
 # output
 out
-inf_out
+inf_results
+eval_results
 
 # dataset
 data

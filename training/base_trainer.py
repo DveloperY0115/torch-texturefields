@@ -27,9 +27,7 @@ class BaseTrainer:
             self.opts.out_dir, self.opts.dataset_type
         )
 
-        self.device = self.configure_device(
-            self.opts.device_id, self.opts.no_cuda, self.opts.use_multi_gpu
-        )
+        self.device = self.configure_device(self.opts.no_cuda)
 
     def train(self):
         """
@@ -51,17 +49,13 @@ class BaseTrainer:
 
     # Helper functions for configuring the trainer
 
-    def configure_device(
-        self, device_id: int, no_cuda: bool = False, use_multi_gpu: bool = False
-    ) -> torch.device:
+    def configure_device(self, no_cuda: bool = False) -> torch.device:
         """
         Configure which device to run training on.
         Inform users various tips based on the status of their machine.
     
         Args:
-        - device_id (int): Index of device to be used.
         - no_cuda (bool): Switch for enabling / disabling CUDA usage.
-        - use_multi_gpu (bool): Switch for multi GPU usage.
     
         Returns:
         - device (torch.device): Context-manager in Pytorch which designates the selected device.
@@ -69,7 +63,7 @@ class BaseTrainer:
 
         print("======== Device Configuration ========")
         device = torch.device(
-            "cuda:{}".format(device_id) if torch.cuda.is_available() and not no_cuda else "cpu"
+            "cuda" if torch.cuda.is_available() and not no_cuda else "cpu"
         )
         print("[!] Using {} as default device".format(device))
 
@@ -79,11 +73,6 @@ class BaseTrainer:
 
         if (device.type == "cuda") and (torch.cuda.device_count() > 1):
             print("[!] Multiple GPUs available.")
-
-        if not use_multi_gpu:
-            print("[!] But it's set to start with single GPU")
-            print("[!] It's highly recommended to use multiple GPUs if possible!")
-
         print("======================================")
 
         return device

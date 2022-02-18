@@ -16,7 +16,7 @@ parser = argparse.ArgumentParser()
 # ----- CUDA -----
 parser.add_argument("--no_cuda", type=bool, default=False, help="CUDA is not used when True")
 parser.add_argument(
-    "--device_ids", type=int, default=[0, 1, 3, 4], help="CUDA device ID if multiple devices available"
+    "--device_ids", type=int, default=[2, 3, 4], help="CUDA device ID if multiple devices available"
 )
 
 parser.add_argument("--experiment_setting", type=str, default="conditional")
@@ -29,13 +29,13 @@ parser.add_argument(
     help="Name of the dataset to be used. Can be one of 'shapenet' or 'pix3d'",
 )
 parser.add_argument("--dataset_dir", type=str, required=True)
-parser.add_argument("--batch_size", type=int, default=256, help="Size of a batch")
+parser.add_argument("--batch_size", type=int, default=144, help="Size of a batch")
 parser.add_argument("--test_dataset_size", type=int, default=300, help="Cardinality of test set")
 
 # ----- training parameters -----
 parser.add_argument("--num_epoch", type=int, default=10000, help="Number of epochs for training")
 parser.add_argument(
-    "--num_workers", type=int, default=40, help="Number of workers for data loading"
+    "--num_workers", type=int, default=30, help="Number of workers for data loading"
 )
 parser.add_argument("--lr", type=float, default=0.0001, help="Initial value of learning rate")
 parser.add_argument("--beta1", type=float, default=0.9, help="Beta 1 of Adam")

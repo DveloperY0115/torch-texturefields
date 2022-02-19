@@ -1,10 +1,11 @@
 """
 texturefield_conditional_trainer.py - Trainer for TextureFields conditional model.
 """
-
 import os
 from collections import namedtuple
-from typing import Dict, Iterable, Tuple
+from typing import Dict
+from typing import Iterable
+from typing import Tuple
 
 import torch
 import torch.nn as nn
@@ -14,10 +15,9 @@ import wandb
 from PIL import Image
 from tqdm import tqdm
 
+from .base_trainer import BaseTrainer
 from model.texture_field import TextureFieldsCls
 from util.dataset import ShapeNetSingleClassDataset
-
-from .base_trainer import BaseTrainer
 
 
 class TextureFieldsConditionalTrainer(BaseTrainer):

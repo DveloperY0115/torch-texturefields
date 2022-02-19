@@ -1,7 +1,6 @@
 """
 dataset.py - Set of classes and functions for Texture Fields dataset
 """
-
 import glob
 import os
 import random

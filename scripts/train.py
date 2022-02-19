@@ -37,7 +37,8 @@ parser.add_argument("--num_epoch", type=int, default=10000, help="Number of epoc
 parser.add_argument(
     "--num_workers", type=int, default=30, help="Number of workers for data loading"
 )
-parser.add_argument("--lr", type=float, default=0.0001, help="Initial value of learning rate")
+#parser.add_argument("--lr", type=float, default=0.0001, help="Initial value of learning rate")
+parser.add_argument("--lr", type=float, default=1e-3, help="Initial value of learning rate")
 parser.add_argument("--beta1", type=float, default=0.9, help="Beta 1 of Adam")
 parser.add_argument("--beta2", type=float, default=0.999, help="Beta 2 of Adam")
 

@@ -21,10 +21,12 @@ from util.dataset import ShapeNetSingleClassDataset
 
 
 class TextureFieldsConditionalTrainer(BaseTrainer):
+
     def __init__(self, opts: namedtuple, checkpoint: str = None):
         super().__init__(opts=opts)
 
-        self.model = TextureFieldsCls(self.opts.experiment_setting).to(self.device)
+        self.model = TextureFieldsCls(self.opts.experiment_setting).to(
+            self.device)
 
         print("[!] Using device(s): ", self.opts.device_ids)
         self.model = nn.DataParallel(self.model, opts.device_ids)
@@ -40,7 +42,8 @@ class TextureFieldsConditionalTrainer(BaseTrainer):
         # load checkpoint if available
         if checkpoint is not None:
             if self.load_checkpoint(checkpoint):
-                print("[!] Successfully loaded checkpoint at {}".format(checkpoint))
+                print("[!] Successfully loaded checkpoint at {}".format(
+                    checkpoint))
             else:
                 print("[!] Failed to load checkpoint at {}".format(checkpoint))
 
@@ -96,7 +99,8 @@ class TextureFieldsConditionalTrainer(BaseTrainer):
             pointcloud = torch.cat([p, n], dim=1)
 
             # forward propagation
-            out = self.model(depth, cam_K, cam_R, pointcloud, condition_img, img)
+            out = self.model(depth, cam_K, cam_R, pointcloud, condition_img,
+                             img)
 
             loss = out["loss"]
             loss = loss.mean()
@@ -138,7 +142,8 @@ class TextureFieldsConditionalTrainer(BaseTrainer):
                 pointcloud = torch.cat([p, n], dim=1)
 
                 # forward propagation
-                out = self.model(depth, cam_K, cam_R, pointcloud, condition_img, img)
+                out = self.model(depth, cam_K, cam_R, pointcloud,
+                                 condition_img, img)
 
                 gen_imgs = out["img_pred"]
                 loss = out["loss"]
@@ -146,15 +151,15 @@ class TextureFieldsConditionalTrainer(BaseTrainer):
 
                 test_loss += loss.item()
 
-                assert (
-                    gen_imgs is not None
-                ), "[!] Set of predicted images must not be empty."
+                assert (gen_imgs is not None
+                        ), "[!] Set of predicted images must not be empty."
 
                 if self.opts.log_wandb:
                     # log RGB images
                     gen_imgs = gen_imgs.permute(0, 2, 3, 1).cpu().numpy()
                     img = img.permute(0, 2, 3, 1).cpu().numpy()
-                    condition_img = condition_img.permute(0, 2, 3, 1).cpu().numpy()
+                    condition_img = condition_img.permute(0, 2, 3,
+                                                          1).cpu().numpy()
 
                     # log depth maps
                     depth[torch.isinf(depth)] = 0
@@ -166,11 +171,11 @@ class TextureFieldsConditionalTrainer(BaseTrainer):
                     # log only 5 images out of other samples
                     log_dict = {
                         "Images/GT": [wandb.Image(x) for x in img[:5]],
-                        "Images/Predicted-Generated": [
-                            wandb.Image(x) for x in gen_imgs[:5]
-                        ],
+                        "Images/Predicted-Generated":
+                        [wandb.Image(x) for x in gen_imgs[:5]],
                         "Images/Depth": [wandb.Image(x) for x in depth[:5]],
-                        "Images/Condition": [wandb.Image(x) for x in condition_img[:5]],
+                        "Images/Condition":
+                        [wandb.Image(x) for x in condition_img[:5]],
                     }
 
                     wandb.log(log_dict, step=self.epoch)
@@ -211,7 +216,8 @@ class TextureFieldsConditionalTrainer(BaseTrainer):
                 pointcloud = torch.cat([p, n], dim=1)
 
                 # forward propagation
-                out = self.model(depth, cam_K, cam_R, pointcloud, condition_img, img)
+                out = self.model(depth, cam_K, cam_R, pointcloud,
+                                 condition_img, img)
 
                 gt_imgs = img
                 gen_imgs = out["img_pred"]
@@ -234,14 +240,12 @@ class TextureFieldsConditionalTrainer(BaseTrainer):
 
                     gt_img.save(
                         os.path.join(
-                            out_dir, "real/{}.jpg".format(str(sample_idx).zfill(6))
-                        )
-                    )
+                            out_dir,
+                            "real/{}.jpg".format(str(sample_idx).zfill(6))))
                     fake_img.save(
                         os.path.join(
-                            out_dir, "fake/{}.jpg".format(str(sample_idx).zfill(6))
-                        )
-                    )
+                            out_dir,
+                            "fake/{}.jpg".format(str(sample_idx).zfill(6))))
 
                     sample_idx += 1
 
@@ -249,11 +253,8 @@ class TextureFieldsConditionalTrainer(BaseTrainer):
 
             inf_total_loss /= sample_idx
 
-        print(
-            "[!] Total inference loss computed over {} samples: {}".format(
-                sample_idx, inf_total_loss
-            )
-        )
+        print("[!] Total inference loss computed over {} samples: {}".format(
+            sample_idx, inf_total_loss))
 
     def configure_optimizer(self) -> torch.optim.Optimizer:
         optimizer = optim.Adam(self.model.parameters(), lr=self.opts.lr)
@@ -263,8 +264,7 @@ class TextureFieldsConditionalTrainer(BaseTrainer):
         return None
 
     def configure_dataset(
-        self,
-    ) -> Tuple[torch.utils.data.Dataset, torch.utils.data.Dataset]:
+        self, ) -> Tuple[torch.utils.data.Dataset, torch.utils.data.Dataset]:
         if self.opts.dataset_type == "shapenet":
 
             # look for indexing for train / test data
@@ -272,8 +272,7 @@ class TextureFieldsConditionalTrainer(BaseTrainer):
                 os.path.join(
                     self.opts.dataset_dir,
                     "train.lst",
-                )
-            ), "[!] Index for train data is missing. Aborting.."
+                )), "[!] Index for train data is missing. Aborting.."
 
             with open(os.path.join(self.opts.dataset_dir, "train.lst")) as f:
                 train_sample_ids = f.readlines()
@@ -321,7 +320,8 @@ class TextureFieldsConditionalTrainer(BaseTrainer):
             self.test_dataset,
             batch_size=self.opts.batch_size,
             shuffle=False,
-            num_workers=self.opts.num_workers // 2 if self.opts.num_workers > 1 else 1,
+            num_workers=self.opts.num_workers //
+            2 if self.opts.num_workers > 1 else 1,
             drop_last=False,
         )
 

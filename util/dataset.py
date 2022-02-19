@@ -19,6 +19,7 @@ imageio.plugins.freeimage.download()
 
 
 class ShapeNetSingleClassDataset(data.Dataset):
+
     def __init__(
         self,
         dataset_directory: str,
@@ -71,22 +72,16 @@ class ShapeNetSingleClassDataset(data.Dataset):
             metadata = {}
 
         # transforms
-        self.transform_img = T.Compose(
-            [
-                ResizeImage((img_size, img_size), order=0),
-            ]
-        )
-        self.transform_img_conditional = T.Compose(
-            [
-                ResizeImage((224, 224), order=0),
-            ]
-        )
-        self.transform_depth = T.Compose(
-            [
-                ImageToDepthValue(),
-                ResizeImage((img_size, img_size), order=0),
-            ]
-        )
+        self.transform_img = T.Compose([
+            ResizeImage((img_size, img_size), order=0),
+        ])
+        self.transform_img_conditional = T.Compose([
+            ResizeImage((224, 224), order=0),
+        ])
+        self.transform_depth = T.Compose([
+            ImageToDepthValue(),
+            ResizeImage((img_size, img_size), order=0),
+        ])
         transform_pcl = [SubsamplePointcloud(num_pc_samples)]
         if num_neighbors is not None:
             transform_pcl.append(ComputeKNNPointcloud(num_neighbors))
@@ -118,8 +113,7 @@ class ShapeNetSingleClassDataset(data.Dataset):
 
         # load image
         img, depth_map, camera_params = self.load_img_and_depth(
-            sample_dir, [random.randint(0, 9)]
-        )
+            sample_dir, [random.randint(0, 9)])
 
         # load conditional image
         condition_img = self.load_condition_img(sample_dir)
@@ -152,18 +146,17 @@ class ShapeNetSingleClassDataset(data.Dataset):
         depth_dir = os.path.join(sample_directory, "depth")
 
         assert os.path.exists(
-            image_dir
-        ), "[!] Directory of images {} doesn't exist".format(image_dir)
+            image_dir), "[!] Directory of images {} doesn't exist".format(
+                image_dir)
         assert os.path.exists(
-            depth_dir
-        ), "[!] Directory of depth maps {} doesn't exist".format(depth_dir)
+            depth_dir), "[!] Directory of depth maps {} doesn't exist".format(
+                depth_dir)
 
         image_files = glob.glob(os.path.join(image_dir, "*.{}".format("png")))
         depth_files = glob.glob(os.path.join(depth_dir, "*.{}".format("exr")))
 
         assert len(image_files) == len(
-            depth_files
-        ), "[!] Number of images and depth maps should match."
+            depth_files), "[!] Number of images and depth maps should match."
 
         image_files.sort()
         depth_files.sort()
@@ -192,12 +185,15 @@ class ShapeNetSingleClassDataset(data.Dataset):
             camera_dict = np.load(camera_file)
 
             for idx in indices:
-                Rt = torch.tensor(camera_dict["world_mat_%d" % idx].astype(np.float32))
-                K = torch.tensor(camera_dict["camera_mat_%d" % idx].astype(np.float32))
+                Rt = torch.tensor(camera_dict["world_mat_%d" % idx].astype(
+                    np.float32))
+                K = torch.tensor(camera_dict["camera_mat_%d" % idx].astype(
+                    np.float32))
                 camera_params["Rt"].append(Rt)
                 camera_params["K"].append(K)
 
-            camera_params["Rt"] = torch.cat(camera_params["Rt"], dim=0).squeeze()
+            camera_params["Rt"] = torch.cat(camera_params["Rt"],
+                                            dim=0).squeeze()
             camera_params["K"] = torch.cat(camera_params["K"], dim=0).squeeze()
 
         return images, depth_maps, camera_params
@@ -220,7 +216,8 @@ class ShapeNetSingleClassDataset(data.Dataset):
 
         assert os.path.exists(
             image_dir
-        ), "[!] Directory of condition images {} doesn't exist".format(image_dir)
+        ), "[!] Directory of condition images {} doesn't exist".format(
+            image_dir)
 
         image_files = glob.glob(os.path.join(image_dir, "*.{}".format("jpg")))
         image_files.sort()
@@ -257,8 +254,8 @@ class ShapeNetSingleClassDataset(data.Dataset):
         filename = os.path.join(sample_directory, "pointcloud.npz")
 
         assert os.path.exists(
-            filename
-        ), "[!] Point cloud file at {} doesn't exist".format(filename)
+            filename), "[!] Point cloud file at {} doesn't exist".format(
+                filename)
 
         pointcloud_dict = np.load(filename)
 

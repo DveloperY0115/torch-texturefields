@@ -3,17 +3,16 @@ texturefield_conditional_trainer.py - Trainer for TextureFields conditional mode
 """
 
 import os
-from PIL import Image
-from typing import Dict, Iterable, Tuple
 from collections import namedtuple
-from tqdm import tqdm
-
-import wandb
+from typing import Dict, Iterable, Tuple
 
 import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.utils.data as data
+import wandb
+from PIL import Image
+from tqdm import tqdm
 
 from model.texture_field import TextureFieldsCls
 from util.dataset import ShapeNetSingleClassDataset

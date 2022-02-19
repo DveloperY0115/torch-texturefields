@@ -2,17 +2,19 @@
 dataset.py - Set of classes and functions for Texture Fields dataset
 """
 
-from .transforms import *
-import torchvision.transforms as T
-from torch.utils import data
-import torch
-import numpy as np
-from typing import List
-import os
-import yaml
-import random
 import glob
+import os
+import random
+from typing import List
+
 import imageio
+import numpy as np
+import torch
+import torchvision.transforms as T
+import yaml
+from torch.utils import data
+
+from .transforms import *
 
 imageio.plugins.freeimage.download()
 

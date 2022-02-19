@@ -2,6 +2,12 @@
 dataset.py - Set of classes and functions for Texture Fields dataset
 """
 
+from .transforms import *
+import torchvision.transforms as T
+from torch.utils import data
+import torch
+import numpy as np
+from typing import List
 import os
 import yaml
 import random
@@ -9,24 +15,15 @@ import glob
 import imageio
 imageio.plugins.freeimage.download()
 
-from typing import List
-import numpy as np
-
-import torch
-from torch.utils import data
-import torchvision.transforms as T
-
-from .transforms import *
-
 
 class ShapeNetSingleClassDataset(data.Dataset):
     def __init__(
-        self, 
-        dataset_directory: str,
-        sample_ids: List[int],
-        img_size: int, 
-        num_pc_samples: int, 
-        num_neighbors=None):
+            self,
+            dataset_directory: str,
+            sample_ids: List[int],
+            img_size: int,
+            num_pc_samples: int,
+            num_neighbors=None):
         """
         Constructor of ShapeNetSingleClassDataset.
 
@@ -36,14 +33,14 @@ class ShapeNetSingleClassDataset(data.Dataset):
         Assumes directories of form:
         ------------------------------------------------
         - shapenet
-	        - classA (e.g. car, chair, etc)
-		    - sample1
-			    - depth/depth_files (.exr)
-			    - image/img_files (.png)
-			    - input_image/img_files (.png)
-			    - visualize/img_files (.png)
-		    - sample2
-		    - and so on
+                - classA (e.g. car, chair, etc)
+                    - sample1
+                            - depth/depth_files (.exr)
+                            - image/img_files (.png)
+                            - input_image/img_files (.png)
+                            - visualize/img_files (.png)
+                    - sample2
+                    - and so on
         ------------------------------------------------
         Then for the argument 'dataset_directory', the value 'shapenet/classA/' should be provided.
 
@@ -71,10 +68,12 @@ class ShapeNetSingleClassDataset(data.Dataset):
             metadata = {}
 
         # transforms
-        self.transform_img = T.Compose([ResizeImage((img_size, img_size), order=0),])
-        self.transform_img_conditional = T.Compose([ResizeImage((224, 224), order=0),])
+        self.transform_img = T.Compose(
+            [ResizeImage((img_size, img_size), order=0), ])
+        self.transform_img_conditional = T.Compose(
+            [ResizeImage((224, 224), order=0), ])
         self.transform_depth = T.Compose(
-            [ImageToDepthValue(), ResizeImage((img_size, img_size), order=0),]
+            [ImageToDepthValue(), ResizeImage((img_size, img_size), order=0), ]
         )
         transform_pcl = [SubsamplePointcloud(num_pc_samples)]
         if num_neighbors is not None:
@@ -106,7 +105,8 @@ class ShapeNetSingleClassDataset(data.Dataset):
         sample_dir = os.path.join(self.dataset_directory, self.samples[idx])
 
         # load image
-        img, depth_map, camera_params = self.load_img_and_depth(sample_dir, [random.randint(0, 9)])
+        img, depth_map, camera_params = self.load_img_and_depth(
+            sample_dir, [random.randint(0, 9)])
 
         # load conditional image
         condition_img = self.load_condition_img(sample_dir)
@@ -179,12 +179,15 @@ class ShapeNetSingleClassDataset(data.Dataset):
             camera_dict = np.load(camera_file)
 
             for idx in indices:
-                Rt = torch.tensor(camera_dict["world_mat_%d" % idx].astype(np.float32))
-                K = torch.tensor(camera_dict["camera_mat_%d" % idx].astype(np.float32))
+                Rt = torch.tensor(
+                    camera_dict["world_mat_%d" % idx].astype(np.float32))
+                K = torch.tensor(
+                    camera_dict["camera_mat_%d" % idx].astype(np.float32))
                 camera_params["Rt"].append(Rt)
                 camera_params["K"].append(K)
 
-            camera_params["Rt"] = torch.cat(camera_params["Rt"], dim=0).squeeze()
+            camera_params["Rt"] = torch.cat(
+                camera_params["Rt"], dim=0).squeeze()
             camera_params["K"] = torch.cat(camera_params["K"], dim=0).squeeze()
 
         return images, depth_maps, camera_params
@@ -243,7 +246,8 @@ class ShapeNetSingleClassDataset(data.Dataset):
         """
         filename = os.path.join(sample_directory, "pointcloud.npz")
 
-        assert os.path.exists(filename), "[!] Point cloud file at {} doesn't exist".format(filename)
+        assert os.path.exists(
+            filename), "[!] Point cloud file at {} doesn't exist".format(filename)
 
         pointcloud_dict = np.load(filename)
 
@@ -271,7 +275,7 @@ def load_depth_map(filename, transform=None):
     Args:
     - filename (str): Name of a image file to be loaded.
     - transform (torchvision.transform): Transforms to be applied.
-    
+
     Returns:
     - depth (torch.Tensor): Tensor of shape (1, H, W).
     """

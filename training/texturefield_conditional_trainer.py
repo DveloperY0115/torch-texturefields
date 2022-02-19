@@ -25,7 +25,8 @@ class TextureFieldsConditionalTrainer(BaseTrainer):
     def __init__(self, opts: namedtuple, checkpoint: str = None):
         super().__init__(opts=opts)
 
-        self.model = TextureFieldsCls(self.opts.experiment_setting).to(self.device)
+        self.model = TextureFieldsCls(
+            self.opts.experiment_setting).to(self.device)
 
         print("[!] Using device(s): ", self.opts.device_ids)
         self.model = nn.DataParallel(self.model, opts.device_ids)
@@ -74,7 +75,7 @@ class TextureFieldsConditionalTrainer(BaseTrainer):
         Train the model for one epoch.
         """
         train_loss = 0
-        
+
         for train_batch in self.train_loader:
             # initialize gradient
             self.optimizer.zero_grad()
@@ -97,7 +98,8 @@ class TextureFieldsConditionalTrainer(BaseTrainer):
             pointcloud = torch.cat([p, n], dim=1)
 
             # forward propagation
-            out = self.model(depth, cam_K, cam_R, pointcloud, condition_img, img)
+            out = self.model(depth, cam_K, cam_R,
+                             pointcloud, condition_img, img)
 
             loss = out["loss"]
             loss = loss.mean()
@@ -139,21 +141,23 @@ class TextureFieldsConditionalTrainer(BaseTrainer):
                 pointcloud = torch.cat([p, n], dim=1)
 
                 # forward propagation
-                out = self.model(depth, cam_K, cam_R, pointcloud, condition_img, img)
+                out = self.model(depth, cam_K, cam_R,
+                                 pointcloud, condition_img, img)
 
                 gen_imgs = out["img_pred"]
                 loss = out["loss"]
                 loss = loss.mean()
 
                 test_loss += loss.item()
-    
+
                 assert gen_imgs is not None, "[!] Set of predicted images must not be empty."
 
                 if self.opts.log_wandb:
                     # log RGB images
                     gen_imgs = gen_imgs.permute(0, 2, 3, 1).cpu().numpy()
                     img = img.permute(0, 2, 3, 1).cpu().numpy()
-                    condition_img = condition_img.permute(0, 2, 3, 1).cpu().numpy()
+                    condition_img = condition_img.permute(
+                        0, 2, 3, 1).cpu().numpy()
 
                     # log depth maps
                     depth[torch.isinf(depth)] = 0
@@ -184,7 +188,7 @@ class TextureFieldsConditionalTrainer(BaseTrainer):
             os.mkdir(out_dir)
             os.mkdir(os.path.join(out_dir, "real"))
             os.mkdir(os.path.join(out_dir, "fake"))
-            print("[!] Created directory %s." % out_dir)   
+            print("[!] Created directory %s." % out_dir)
 
         inf_total_loss = 0.0
         sample_idx = 0
@@ -208,7 +212,8 @@ class TextureFieldsConditionalTrainer(BaseTrainer):
                 pointcloud = torch.cat([p, n], dim=1)
 
                 # forward propagation
-                out = self.model(depth, cam_K, cam_R, pointcloud, condition_img, img)
+                out = self.model(depth, cam_K, cam_R,
+                                 pointcloud, condition_img, img)
 
                 gt_imgs = img
                 gen_imgs = out["img_pred"]
@@ -221,14 +226,18 @@ class TextureFieldsConditionalTrainer(BaseTrainer):
                     fake *= 255.0
                     gt = gt.type(torch.uint8)
                     fake = fake.type(torch.uint8)
-                    gt = gt.permute((1, 2, 0)).cpu().numpy()      # (C, H, W) -> (H, W, C)
-                    fake = fake.permute((1, 2, 0)).cpu().numpy()  # (C, H, W) -> (H, W, C)
+                    # (C, H, W) -> (H, W, C)
+                    gt = gt.permute((1, 2, 0)).cpu().numpy()
+                    # (C, H, W) -> (H, W, C)
+                    fake = fake.permute((1, 2, 0)).cpu().numpy()
 
                     gt_img = Image.fromarray(gt)
                     fake_img = Image.fromarray(fake)
 
-                    gt_img.save(os.path.join(out_dir, "real/{}.jpg".format(str(sample_idx).zfill(6))))
-                    fake_img.save(os.path.join(out_dir, "fake/{}.jpg".format(str(sample_idx).zfill(6))))
+                    gt_img.save(os.path.join(
+                        out_dir, "real/{}.jpg".format(str(sample_idx).zfill(6))))
+                    fake_img.save(os.path.join(
+                        out_dir, "fake/{}.jpg".format(str(sample_idx).zfill(6))))
 
                     sample_idx += 1
 
@@ -236,7 +245,8 @@ class TextureFieldsConditionalTrainer(BaseTrainer):
 
             inf_total_loss /= (sample_idx)
 
-        print("[!] Total inference loss computed over {} samples: {}".format(sample_idx, inf_total_loss))
+        print("[!] Total inference loss computed over {} samples: {}".format(
+            sample_idx, inf_total_loss))
 
     def configure_optimizer(self) -> torch.optim.Optimizer:
         optimizer = optim.Adam(self.model.parameters(), lr=self.opts.lr)
@@ -262,7 +272,7 @@ class TextureFieldsConditionalTrainer(BaseTrainer):
                 train_dataset = ShapeNetSingleClassDataset(
                     self.opts.dataset_dir,
                     train_sample_ids,
-                    img_size=128, 
+                    img_size=128,
                     num_pc_samples=2048,
                 )
 
@@ -273,7 +283,7 @@ class TextureFieldsConditionalTrainer(BaseTrainer):
                 test_dataset = ShapeNetSingleClassDataset(
                     self.opts.dataset_dir,
                     test_sample_ids,
-                    img_size=128, 
+                    img_size=128,
                     num_pc_samples=2048,
                 )
 
@@ -298,12 +308,11 @@ class TextureFieldsConditionalTrainer(BaseTrainer):
         )
 
         test_loader = data.DataLoader(
-            self.test_dataset, 
-            batch_size=self.opts.batch_size, 
+            self.test_dataset,
+            batch_size=self.opts.batch_size,
             shuffle=False,
             num_workers=self.opts.num_workers // 2 if self.opts.num_workers > 1 else 1,
             drop_last=False,
         )
 
         return train_loader, test_loader
-

@@ -257,6 +257,7 @@ class TextureFieldsConditionalTrainer(BaseTrainer):
 
             with open(os.path.join(self.opts.dataset_dir, "train.lst")) as f:
                 train_sample_ids = f.readlines()
+                train_sample_ids = [line.rstrip() for line in train_sample_ids]
 
                 train_dataset = ShapeNetSingleClassDataset(
                     self.opts.dataset_dir,
@@ -267,6 +268,7 @@ class TextureFieldsConditionalTrainer(BaseTrainer):
 
             with open(os.path.join(self.opts.dataset_dir, "test.lst")) as f:
                 test_sample_ids = f.readlines()
+                test_sample_ids = [line.rstrip() for line in test_sample_ids]
 
                 test_dataset = ShapeNetSingleClassDataset(
                     self.opts.dataset_dir,

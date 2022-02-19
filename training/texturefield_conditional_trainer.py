@@ -52,6 +52,8 @@ class TextureFieldsConditionalTrainer(BaseTrainer):
     def train(self):
         print("Begin training..")
 
+        min_test_loss = 1000.0
+
         for self.epoch in tqdm(range(self.initial_epoch, self.opts.num_epoch)):
             train_loss = self.train_one_epoch()
             test_loss = self.test_one_epoch()
@@ -65,6 +67,10 @@ class TextureFieldsConditionalTrainer(BaseTrainer):
             if self.opts.log_wandb:
                 wandb.log({"Loss/Train": train_loss}, step=self.epoch)
                 wandb.log({"Loss/Test": test_loss}, step=self.epoch)
+
+            if test_loss < min_test_loss:
+                self.save_checkpoint("best")
+                min_test_loss = test_loss
 
             if (self.epoch + 1) % self.opts.save_period == 0:
                 self.save_checkpoint()

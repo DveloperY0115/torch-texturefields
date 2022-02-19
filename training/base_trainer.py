@@ -118,16 +118,21 @@ class BaseTrainer:
 
         return out_root, log_dir, checkpoint_dir
 
-    def save_checkpoint(self):
+    def save_checkpoint(self, tag: str = None):
         """
         Save checkpoint.
         """
         if not os.path.exists(self.checkpoint_dir):
             os.mkdir(self.checkpoint_dir)
 
-        save_path = os.path.join(
-            self.checkpoint_dir, "checkpoint-epoch-{}.tar".format(self.epoch + 1)
-        )
+        if tag is not None:
+            save_path = os.path.join(
+                self.checkpoint_dir, "checkpoint-{}.tar".format(tag),
+            )
+        else:
+            save_path = os.path.join(
+                self.checkpoint_dir, "checkpoint-epoch-{}.tar".format(self.epoch + 1),
+            )
 
         checkpoint = {}
 

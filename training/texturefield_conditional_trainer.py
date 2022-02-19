@@ -247,21 +247,42 @@ class TextureFieldsConditionalTrainer(BaseTrainer):
 
     def configure_dataset(self) -> Tuple[torch.utils.data.Dataset, torch.utils.data.Dataset]:
         if self.opts.dataset_type == "shapenet":
-            dataset = ShapeNetSingleClassDataset(
-                self.opts.dataset_dir, img_size=128, num_pc_samples=2048
-            )
+
+            # look for indexing for train / test data
+            assert os.path.exists(
+                os.path.join(
+                    self.opts.dataset_dir, "train.lst",
+                )
+            ), "[!] Index for train data is missing. Aborting.."
+
+            with open(os.path.join(self.opts.dataset_dir, "train.lst")) as f:
+                train_sample_ids = f.readlines()
+                train_sample_ids = [line.rstrip() for line in train_sample_ids]
+
+                train_dataset = ShapeNetSingleClassDataset(
+                    self.opts.dataset_dir,
+                    train_sample_ids,
+                    img_size=128, 
+                    num_pc_samples=2048,
+                )
+
+            with open(os.path.join(self.opts.dataset_dir, "test.lst")) as f:
+                test_sample_ids = f.readlines()
+                test_sample_ids = [line.rstrip() for line in test_sample_ids]
+
+                test_dataset = ShapeNetSingleClassDataset(
+                    self.opts.dataset_dir,
+                    test_sample_ids,
+                    img_size=128, 
+                    num_pc_samples=2048,
+                )
+
             print("[!] Dataset used: ShapeNet")
         else:
             print(
                 "[!] Please provide valid dataset type. Either 'shapenet' or 'pix3d' is supported by now"
             )
             exit()
-
-        train_dataset, test_dataset = data.random_split(
-            dataset,
-            [len(dataset) - self.opts.test_dataset_size, self.opts.test_dataset_size],
-            generator=torch.Generator().manual_seed(42),
-        )
 
         return train_dataset, test_dataset
 

@@ -8,6 +8,8 @@ import random
 import glob
 import imageio
 imageio.plugins.freeimage.download()
+
+from typing import List
 import numpy as np
 
 import torch
@@ -18,7 +20,13 @@ from .transforms import *
 
 
 class ShapeNetSingleClassDataset(data.Dataset):
-    def __init__(self, dataset_directory, img_size, num_pc_samples, num_neighbors=None):
+    def __init__(
+        self, 
+        dataset_directory: str,
+        sample_ids: List[int],
+        img_size: int, 
+        num_pc_samples: int, 
+        num_neighbors=None):
         """
         Constructor of ShapeNetSingleClassDataset.
 
@@ -41,15 +49,18 @@ class ShapeNetSingleClassDataset(data.Dataset):
 
         Args:
         - dataset_directory (str or os.path): Directory where data is located.
+        - sample_ids (List of int): List of sample IDs included in this dataset.
+            Typically, sample IDs are explicitly given for each train/test datasets.
         - img_size (int): Size of image along one dimension. (e.g. for img_size = 128, images will be resized to 128x128)
         - num_pc_samples (int): Number of points to be selected during point cloud subsampling.
         - num_neighbors (int): Number of neighbors used during KNN computation.
         """
         super(ShapeNetSingleClassDataset, self).__init__()
 
+        # identify dataset root directory & sample IDs
         self.dataset_directory = dataset_directory
-
-        self.samples = os.listdir(self.dataset_directory)
+        self.samples = sample_ids
+        self.num_samples = len(self.samples)
 
         # read metadata if exists
         metadata_file = os.path.join(dataset_directory, "metadata.yaml")
@@ -77,7 +88,7 @@ class ShapeNetSingleClassDataset(data.Dataset):
         Returns:
         - num_data (int): Number of samples in the dataset
         """
-        return len(self.samples)
+        return self.num_samples
 
     def __getitem__(self, idx):
         """
